@@ -34,7 +34,90 @@ This:
 - builds the images (including any changes in the `yfinance-wrapper`),
 - starts all services in the background.
 
+### Step 2. Importing an n8n Workflow JSON File
+
+This guide explains how to import an existing workflow `.json` file into n8n.
+
 ---
+
+# Method 1 – Import From File (Recommended)
+
+## Step 1 – Open n8n
+
+Start your n8n instance and open the editor UI in your browser.
+
+Example:
+
+```text id="qzvh3q"
+http://localhost:5678
+```
+
+or your hosted n8n URL.
+
+---
+
+## Step 2 – Open the Workflows Page
+
+In the left sidebar:
+
+1. Click **Workflows**
+2. Click **Add Workflow** or the **+** button
+
+---
+
+## Step 3 – Import Workflow
+
+Inside the workflow editor:
+
+1. Click the **three dots menu** (`⋯`) in the top-right corner
+2. Select:
+
+```text id="jmh5fy"
+Import from File
+```
+
+---
+
+## Step 4 – Select the JSON File
+
+Choose your exported workflow file.
+
+Example:
+
+```text id="jlwm6h"
+my-workflow.json
+```
+
+n8n will automatically load:
+
+- Nodes
+- Connections
+- Settings
+- Expressions
+- Credentials references
+
+---
+
+### Step 3. Trigger the workflow
+
+# Important Notes
+
+## Credentials Are Not Included
+
+Workflow JSON files usually do **not** include API credentials for security reasons.
+
+After importing, you may need to reconnect:
+
+- API keys
+- OAuth accounts
+- Database credentials
+- Webhook authentication
+
+Nodes missing credentials will show warnings until configured.
+
+---
+
+##
 
 ### 2. If you make changes to the code
 
