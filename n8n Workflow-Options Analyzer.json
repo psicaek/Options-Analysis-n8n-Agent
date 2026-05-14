@@ -1,0 +1,931 @@
+{
+  "name": "Options Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 11,
+              "triggerAtMinute": 30
+            },
+            {
+              "triggerAtHour": 15,
+              "triggerAtMinute": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-784, 224],
+      "id": "2125410f-0f97-42c6-9d16-31a179f751a2",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fromEmail": "io**********@gmail.com",
+        "toEmail": "ps********k@hotmail.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [3072, 224],
+      "id": "*********",
+      "name": "Send an Email",
+      "webhookId": "*******",
+      "credentials": {
+        "smtp": {
+          "id": "*********You must add credentials to the workflow to use this node*********",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/data/nasdaq_screener_1777828390948.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [192, -368],
+      "id": "06c21008-dea9-43cc-a274-2784b16c3fc2",
+      "name": "Read/Write Files from Disk",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [368, -368],
+      "id": "cd40279a-371c-46b2-9cd5-9eb3535a0c73",
+      "name": "Extract from File",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({\n  json: {\n    ticker: item.json.Symbol,\n    price: item.json[\"Last Sale\"]\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [544, -368],
+      "id": "ca6bec4a-7fc0-419e-a68d-49ea3168ab6a",
+      "name": "Step 2 Extract from file",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .map(item => {\n    const rawPrice = String(item.json.price ?? item.json[\"Last Sale\"] ?? \"\").replace(/[$,]/g, \"\");\n    const price = parseFloat(rawPrice);\n\n    return {\n      json: {\n        ticker: item.json.ticker ?? item.json.Symbol,\n        price\n      }\n    };\n  })\n  .filter(item => item.json.ticker && !isNaN(item.json.price) && item.json.price >= 0 && item.json.price <= 30000);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [752, -368],
+      "id": "a6fe917c-ce27-463e-8c4b-f0f33161bcfb",
+      "name": "Step 3 Filter by Price",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a risk-aware options trader. Analyze the provided covered-call candidates and rank the safest 5 trades.\n\nInput data:\n{{ $json.chatInput }}\n\nTasks:\n\n1. For each ticker, review the last 3 months of:\n- Company news and catalysts\n- Earnings results and next earnings date\n- Dividend status and next dividend date, if any\n- Technical view: Strong Buy, Buy, Neutral, Sell, or Strong Sell\n\n2. For each ticker, explain the technical view in simple words.\nExample:\n- Strong Buy = price trend is healthy and momentum is positive\n- Neutral = mixed signals, no strong edge\n- Strong Sell = trend is weak and downside risk is elevated\n\n3. Give each ticker a total score out of 10 using:\n- News / catalyst quality: 0–3\n- Earnings / dividend stability: 0–3\n- Technical strength: 0–4\n\n4. After scoring, explain each score in one sentence:\n\"Score X/10 means [low / medium / high] risk because [brief reason].\"\n\n5. Rank and select the 3–4 safest covered calls using this priority order:\n- Open interest >= 400\n- Volume >= 20\n- Reward-vs-risk between 0.10 and 0.13\n- Strike close to current price, preferably 2% to 10% OTM\n- Days to expiry between 30 and 120\n- If similar, prefer higher open interest\n- Use news, earnings/dividend timing, technicals, VRP, and put/call signal as tie-breakers\n\n6. For each selected trade, explain:\n- 1–2 sentences on company news / earnings / dividend / technical sentiment\n- 1–2 sentences on why this covered call is safer than the others\n\n7. For each selected trade, calculate covered-call outcomes in this format:\n\nStrategy: Covered Call on [TICKER]  \nExpiration: [DATE] ([DTE] days)  \nStrike Price: $[STRIKE] ([X% from current price])  \nCapital Required: $[CAPITAL REQUIRED] ([NUMBER OF SHARES or units])\n\nOutcomes at Expiration:\n- If Price >= $[STRIKE]: +[X]% USD (+$[PROFIT IN USD])\n- If Price < $[STRIKE]: +[Y]% shares (+[SHARE OR COIN AMOUNT])\n\nUse this covered-call logic:\n- If price finishes below the strike, the option expires worthless; you keep the full premium and still own the shares/coins. [web:2123][web:2107]\n- If price finishes at or above the strike, your shares/coins are called away at the strike; profit equals premium received plus the asset gain from entry price up to the strike, capped there. [web:2117][web:2120][web:2122]\n\nUse this formula for ITM / assigned profit:\nAssigned USD Profit = Premium Received + ((Strike Price - Entry Price) × Position Size)\n\nUse this formula for OTM / unassigned outcome:\nOTM Extra Shares = Premium Received in asset units\n\n8. Add one personal judgment line:\n\"If I were taking this trade myself, I would choose [ticker / strike / expiry] because [brief reason].\"\n\n9. End with a short portfolio risk summary covering:\n- Main upside scenario\n- Main downside scenario\n- Event risk from earnings/dividends/news\n- Whether the group looks conservative, moderate, or aggressive\n\nRequired output format:\n\nA. Summary table\n\n| Rank | Ticker | Strike | Expiry | ROR | Score | Technicals | OTM Outcome | ITM Outcome |\n|------|--------|--------|--------|-----|-------|------------|-------------|-------------|\n\nB. Then, for each selected trade:\n- Ticker, strike, expiry, rewardVsRisk\n- News / earnings / dividend / technical summary\n- Why this covered call looks safer\n- Covered-call outcome block in the exact format above\n\nC. Then:\n- “If I were taking one trade, I would choose …”\n- “Portfolio risk summary: …”\n\nImportant:\n- Be analytical, concise, and practical.\n- Prefer factual recent information over generic commentary.\n- Do not invent earnings or dividend dates; state “not found” if unclear.\n"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [2544, -144],
+      "id": "91c307a9-5d39-4152-8708-e780c60d3d09",
+      "name": "LLM analysis",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a risk-aware options trader. Analyze the provided covered-call candidates and rank the safest 5 trades.\n\nInput data:\n{{ $json.chatInput }}\n\nTasks:\n\n1. For each ticker, review the last 3 months of:\n- Company news and catalysts\n- Earnings results and next earnings date\n- Dividend status and next dividend date, if any\n- Technical view: Strong Buy, Buy, Neutral, Sell, or Strong Sell\n\n2. For each ticker, explain the technical view in simple words.\nExample:\n- Strong Buy = price trend is healthy and momentum is positive\n- Neutral = mixed signals, no strong edge\n- Strong Sell = trend is weak and downside risk is elevated\n\n3. Give each ticker a total score out of 10 using:\n- News / catalyst quality: 0–3\n- Earnings / dividend stability: 0–3\n- Technical strength: 0–4\n\n4. After scoring, explain each score in one sentence:\n\"Score X/10 means [low / medium / high] risk because [brief reason].\"\n\n5. Rank and select the 3–4 safest covered calls using this priority order:\n- Open interest >= 400\n- Volume >= 20\n- Reward-vs-risk between 0.10 and 0.13\n- Strike close to current price, preferably 2% to 10% OTM\n- Days to expiry between 30 and 120\n- If similar, prefer higher open interest\n- Use news, earnings/dividend timing, technicals, VRP, and put/call signal as tie-breakers\n\n6. For each selected trade, explain:\n- 1–2 sentences on company news / earnings / dividend / technical sentiment\n- 1–2 sentences on why this covered call is safer than the others\n\n7. For each selected trade, calculate covered-call outcomes in this format:\n\nStrategy: Covered Call on [TICKER]  \nExpiration: [DATE] ([DTE] days)  \nStrike Price: $[STRIKE] ([X% from current price])  \nCapital Required: $[CAPITAL REQUIRED] ([NUMBER OF SHARES or units])\n\nOutcomes at Expiration:\n- If Price >= $[STRIKE]: +[X]% USD (+$[PROFIT IN USD])\n- If Price < $[STRIKE]: +[Y]% shares (+[SHARE OR COIN AMOUNT])\n\nUse this covered-call logic:\n- If price finishes below the strike, the option expires worthless; you keep the full premium and still own the shares/coins. [web:2123][web:2107]\n- If price finishes at or above the strike, your shares/coins are called away at the strike; profit equals premium received plus the asset gain from entry price up to the strike, capped there. [web:2117][web:2120][web:2122]\n\nUse this formula for ITM / assigned profit:\nAssigned USD Profit = Premium Received + ((Strike Price - Entry Price) × Position Size)\n\nUse this formula for OTM / unassigned outcome:\nOTM Extra Shares = Premium Received in asset units\n\n8. Add one personal judgment line:\n\"If I were taking this trade myself, I would choose [ticker / strike / expiry] because [brief reason].\"\n\n9. End with a short portfolio risk summary covering:\n- Main upside scenario\n- Main downside scenario\n- Event risk from earnings/dividends/news\n- Whether the group looks conservative, moderate, or aggressive\n\nRequired output format:\n\nA. Summary table\n\n| Rank | Ticker | Strike | Expiry | ROR | Score | Technicals | OTM Outcome | ITM Outcome |\n|------|--------|--------|--------|-----|-------|------------|-------------|-------------|\n\nB. Then, for each selected trade:\n- Ticker, strike, expiry, rewardVsRisk\n- News / earnings / dividend / technical summary\n- Why this covered call looks safer\n- Covered-call outcome block in the exact format above\n\nC. Then:\n- “If I were taking one trade, I would choose …”\n- “Portfolio risk summary: …”\n\nImportant:\n- Be analytical, concise, and practical.\n- Prefer factual recent information over generic commentary.\n- Do not invent earnings or dividend dates; state “not found” if unclear.\n"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [2544, 224],
+      "id": "2b2cd43e-53e0-47f6-bb26-c621f2adc9ff",
+      "name": "LLM analysis1",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a risk-aware options trader. Analyze the provided covered-call candidates and rank the safest 5 trades.\n\nInput data:\n{{ $json.chatInput }}\n\nTasks:\n\n1. For each ticker, review the last 3 months of:\n- Company news and catalysts\n- Earnings results and next earnings date\n- Dividend status and next dividend date, if any\n- Technical view: Strong Buy, Buy, Neutral, Sell, or Strong Sell\n\n2. For each ticker, explain the technical view in simple words.\nExample:\n- Strong Buy = price trend is healthy and momentum is positive\n- Neutral = mixed signals, no strong edge\n- Strong Sell = trend is weak and downside risk is elevated\n\n3. Give each ticker a total score out of 10 using:\n- News / catalyst quality: 0–3\n- Earnings / dividend stability: 0–3\n- Technical strength: 0–4\n\n4. After scoring, explain each score in one sentence:\n\"Score X/10 means [low / medium / high] risk because [brief reason].\"\n\n5. Rank and select the 3–4 safest covered calls using this priority order:\n- Open interest >= 400\n- Volume >= 20\n- Reward-vs-risk between 0.10 and 0.13\n- Strike close to current price, preferably 2% to 10% OTM\n- Days to expiry between 30 and 120\n- If similar, prefer higher open interest\n- Use news, earnings/dividend timing, technicals, VRP, and put/call signal as tie-breakers\n\n6. For each selected trade, explain:\n- 1–2 sentences on company news / earnings / dividend / technical sentiment\n- 1–2 sentences on why this covered call is safer than the others\n\n7. For each selected trade, calculate covered-call outcomes in this format:\n\nStrategy: Covered Call on [TICKER]  \nExpiration: [DATE] ([DTE] days)  \nStrike Price: $[STRIKE] ([X% from current price])  \nCapital Required: $[CAPITAL REQUIRED] ([NUMBER OF SHARES or units])\n\nOutcomes at Expiration:\n- If Price >= $[STRIKE]: +[X]% USD (+$[PROFIT IN USD])\n- If Price < $[STRIKE]: +[Y]% shares (+[SHARE OR COIN AMOUNT])\n\nUse this covered-call logic:\n- If price finishes below the strike, the option expires worthless; you keep the full premium and still own the shares/coins. [web:2123][web:2107]\n- If price finishes at or above the strike, your shares/coins are called away at the strike; profit equals premium received plus the asset gain from entry price up to the strike, capped there. [web:2117][web:2120][web:2122]\n\nUse this formula for ITM / assigned profit:\nAssigned USD Profit = Premium Received + ((Strike Price - Entry Price) × Position Size)\n\nUse this formula for OTM / unassigned outcome:\nOTM Extra Shares = Premium Received in asset units\n\n8. Add one personal judgment line:\n\"If I were taking this trade myself, I would choose [ticker / strike / expiry] because [brief reason].\"\n\n9. End with a short portfolio risk summary covering:\n- Main upside scenario\n- Main downside scenario\n- Event risk from earnings/dividends/news\n- Whether the group looks conservative, moderate, or aggressive\n\nRequired output format:\n\nA. Summary table\n\n| Rank | Ticker | Strike | Expiry | ROR | Score | Technicals | OTM Outcome | ITM Outcome |\n|------|--------|--------|--------|-----|-------|------------|-------------|-------------|\n\nB. Then, for each selected trade:\n- Ticker, strike, expiry, rewardVsRisk\n- News / earnings / dividend / technical summary\n- Why this covered call looks safer\n- Covered-call outcome block in the exact format above\n\nC. Then:\n- “If I were taking one trade, I would choose …”\n- “Portfolio risk summary: …”\n\nImportant:\n- Be analytical, concise, and practical.\n- Prefer factual recent information over generic commentary.\n- Do not invent earnings or dividend dates; state “not found” if unclear.\n- Keep explanations simple enough for a non-expert trader."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [2544, 592],
+      "id": "f73cc6b7-a514-4702-b215-88e1bf83fec0",
+      "name": "LLM analysis2",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const reasoning = $input.first().json.text || \"No reasoning provided.\";\n\nconst today = new Date().toISOString().split(\"T\")[0];\n\nreturn [{\n  json: {\n    subject: `📅 Daily Options Safety Report – ${today}`,\n    html: `\n      <h2 style=\"font-family: Arial, sans-serif; color:#111\">Daily Options Safety Report – ${today}</h2>\n\n      <p style=\"font-family: Arial, sans-serif; line-height:1.6\">\n        This is your daily safety review of the top STRONG‑rated short call options.\n      </p>\n\n      <h3 style=\"font-family: Arial, sans-serif; color:#333\">Best safest bets</h3>\n      <pre style=\"background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #ddd; font-size:12px; line-height:1.4; font-family:monospace\">\n${reasoning}\n      </pre>\n\n      <footer style=\"margin-top:20px; color:#777; font-size:11px; font-family:Arial,sans-serif\">\n        This report is auto‑generated by your options‑scanning n8n workflow.\n      </footer>\n    `,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2848, -160],
+      "id": "01adaf50-117b-4532-a221-52d0ebfb8620",
+      "name": "Format AI output"
+    },
+    {
+      "parameters": {
+        "jsCode": "const reasoning = $input.first().json.text || \"No reasoning provided.\";\n\nconst today = new Date().toISOString().split(\"T\")[0];\n\nreturn [{\n  json: {\n    subject: `📅 Daily Options Safety Report – ${today}`,\n    html: `\n      <h2 style=\"font-family: Arial, sans-serif; color:#111\">Daily Options Safety Report – ${today}</h2>\n\n      <p style=\"font-family: Arial, sans-serif; line-height:1.6\">\n        This is your daily safety review of the top STRONG‑rated short call options.\n      </p>\n\n      <h3 style=\"font-family: Arial, sans-serif; color:#333\">Best safest bets</h3>\n      <pre style=\"background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #ddd; font-size:12px; line-height:1.4; font-family:monospace\">\n${reasoning}\n      </pre>\n\n      <footer style=\"margin-top:20px; color:#777; font-size:11px; font-family:Arial,sans-serif\">\n        This report is auto‑generated by your options‑scanning n8n workflow.\n      </footer>\n    `,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2848, 224],
+      "id": "1b9f67ed-84ae-4deb-9ff9-8689a7f98e25",
+      "name": "Format AI output1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const reasoning = $input.first().json.text || \"No reasoning provided.\";\n\nconst today = new Date().toISOString().split(\"T\")[0];\n\nreturn [{\n  json: {\n    subject: `📅 Daily Options Safety Report – ${today}`,\n    html: `\n      <h2 style=\"font-family: Arial, sans-serif; color:#111\">Daily Options Safety Report – ${today}</h2>\n\n      <p style=\"font-family: Arial, sans-serif; line-height:1.6\">\n        This is your daily safety review of the top STRONG‑rated short call options.\n      </p>\n\n      <h3 style=\"font-family: Arial, sans-serif; color:#333\">Best safest bets</h3>\n      <pre style=\"background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #ddd; font-size:12px; line-height:1.4; font-family:monospace\">\n${reasoning}\n      </pre>\n\n      <footer style=\"margin-top:20px; color:#777; font-size:11px; font-family:Arial,sans-serif\">\n        This report is auto‑generated by your options‑scanning n8n workflow.\n      </footer>\n    `,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2848, 592],
+      "id": "d7fe51bb-380e-4d98-9862-497f3aa5fc5c",
+      "name": "Format AI output2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2d2d2b0-3693-467a-b053-2790437287ca",
+              "name": "tickers",
+              "value": "A,AA,AAL,AAMI,AAOI,AAON,AAP,AAPL,AARD,AAT,AB,ABAT,ABBV,ABCB,ABCL,ABEO,ABEV,ABG,ABM,ABNB,ABOS,ABR,ABSI,ABT,ABTC,ABUS,ABVC,ABVE,ABVX,ABX,ACA,ACAD,ACB,ACCO,ACDC,ACEL,ACET,ACGL,ACH,ACHC,ACHR,ACHV,ACI,ACIC,ACIU,ACIW,ACLS,ACM,ACMR,ACN,ACNB,ACNT,ACR,ACRE,ACRS,ACT,ACTG,ACVA,AD,ADAM,ADBE,ADC,ADCT,ADEA,ADI,ADM,ADMA,ADNT,ADP,ADPT,ADSE,ADSK,ADT,ADTN,ADUR,ADUS,ADV,AEE,AEG,AEHR,AEIS,AEM,AEO,AEP,AER,AERO,AES,AESI,AEVA,AEXA",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-592, 384],
+      "id": "52b2574e-0b5c-408e-80e1-84af5eeee3d1",
+      "name": "test tickers"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [2544, 48],
+      "id": "ea0e05ef-8567-4ba7-920d-aedcc6615739",
+      "name": "Google Gemini Chat Model Gemini 3.1 flash lite",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "**********",
+          "name": "*****Add your API credentials to use this node*****"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-tts-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [2544, 752],
+      "id": "e787f578-576e-48da-b36b-45275a9fd815",
+      "name": "Google Gemini Chat Model2 gemini3.1 preview tts",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "**********",
+          "name": "*****Add your API credentials to use this node*****"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [2544, 400],
+      "id": "504e5545-785b-4271-ae82-edf9eada55ed",
+      "name": "Google Gemini Chat Model1 gemini 3 flash preview",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "***********",
+          "name": "*****Add your API credentials to use this node*****"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1803dc7e-daae-4775-8a70-81bf3f399716",
+              "name": "tickers",
+              "value": "A,AA,AAL,AAMI,AAOI,AAON,AAP,AAPL,AARD,AAT,AB,ABAT,ABBV,ABCB,ABCL,ABEO,ABEV,ABG,ABM,ABNB,ABOS,ABR,ABSI,ABT,ABTC,ABUS,ABVC,ABVE,ABVX,ABX,ACA,ACAD,ACB,ACCO,ACDC,ACEL,ACET,ACGL,ACH,ACHC,ACHR,ACHV,ACI,ACIC,ACIU,ACIW,ACLS,ACM,ACMR,ACN,ACNB,ACNT,ACR,ACRE,ACRS,ACT,ACTG,ACVA,AD,ADAM,ADBE,ADC,ADCT,ADEA,ADI,ADM,ADMA,ADNT,ADP,ADPT,ADSE,ADSK,ADT,ADTN,ADUR,ADUS,ADV,AEE,AEG,AEHR,AEIS,AEM,AEO,AEP,AER,AERO,AES,AESI,AEVA,AEXA,AEYE,AFCG,AFG,AFL,AFRM,AFYA,AG,AGCO,AGEN,AGH,AGI,AGIO,AGL,AGM,AGNC,AGO,AGRO,AGX,AGYS,AHCO,AHR,AHRT,AI,AIFC,AIFU,AIG,AIN,AIOT,AIP,AIR,AIRG,AIRJ,AIRO,AIRS,AISP,AIT,AIV,AIZ,AJG,AKAM,AKBA,AKR,ALAB,ALB,ALC,ALDX,ALEC,ALG,ALGM,ALGN,ALGT,ALH,ALHC,ALIT,ALK,ALKS,ALKT,ALL,ALLE,ALLO,ALLT,ALLY,ALM,ALMS,ALMU,ALNT,ALNY,ALOY,ALRM,ALRS,ALSN,ALT,ALTG,ALTI,ALTO,ALV,ALXO,AM,AMAL,AMAT,AMBA,AMBP,AMBQ,AMBR,AMC,AMCR,AMCX,AMD,AME,AMG,AMGN,AMH,AMKR,AMLX,AMN,AMP,AMPG,AMPH,AMPL,AMPX,AMPY,AMR,AMRC,AMRN,AMRX,AMRZ,AMSC,AMSF,AMT,AMTB,AMTM,AMTX,AMWD,AMWL,AMX,AMZN,AN,ANAB,ANDE,ANET,ANF,ANGI,ANGO,ANGX,ANIK,ANIP,ANIX,ANNX,ANRO,ANVS,ANY,AON,AORT,AOS,AOSL,AOUT,AP,APA,APAM,APD,APEI,APG,APGE,APH,API,APLD,APLE,APLS,APO,APOG,APP,APPF,APPN,APPS,APT,APTV,APYX,AQN,AQST,AR,ARAY,ARBE,ARBK,ARCB,ARCC,ARCO,ARCT,ARDT,ARDX,ARE,AREC,AREN,ARES,ARGX,ARHS,ARI,ARIS,ARKO,ARLO,ARLP,ARM,ARMK,ARMP,AROC,AROW,ARQ,ARQQ,ARQT,ARR,ARRY,ARVN,ARW,ARWR,ARX,ARXS,AS,ASA,ASAN,ASB,ASC,ASH,ASIX,ASLE,ASM,ASMB,ASML,ASND,ASO,ASPI,ASPN,ASR,ASRT,ASRV,ASST,ASTE,ASTH,ASTL,ASTS,ASUR,ASX,ASYS,ATAI,ATAT,ATEC,ATEN,ATER,ATEX,ATHM,ATI,ATKR,ATLO,ATLX,ATMU,ATNI,ATNM,ATO,ATOM,ATOS,ATR,ATRC,ATRO,ATS,ATYR,AU,AUB,AUDC,AUGO,AUPH,AUR,AURA,AUTL,AVA,AVAH,AVAV,AVB,AVBP,AVD,AVEX,AVGO,AVIR,AVNS,AVNT,AVNW,AVO,AVPT,AVR,AVT,AVTR,AVTX,AVXL,AVY,AWI,AWK,AWR,AWRE,AX,AXGN,AXON,AXP,AXS,AXSM,AXTA,AXTI,AYI,AZ,AZN,AZO,AZTA,AZZ,B,BA,BABA,BAC,BAH,BALL,BAM,BANC,BAND,BANF,BANR,BANX,BAP,BARK,BATRA,BATRK,BAX,BB,BBAI,BBAR,BBBY,BBCP,BBD,BBDC,BBIO,BBNX,BBSI,BBT,BBUC,BBVA,BBW,BBWI,BBY,BC,BCAB,BCAX,BCBP,BCC,BCE,BCH,BCIC,BCML,BCO,BCPC,BCRX,BCS,BCSF,BCYC,BDC,BDN,BDTX,BDX,BE,BEAM,BEEM,BEKE,BELFB,BEN,BEP,BEPC,BETA,BETR,BFAM,BFH,BFLY,BFS,BFST,BG,BGC,BGS,BGSF,BHB,BHC,BHE,BHF,BHP,BHR,BHVN,BIDU,BIIB,BILI,BILL,BIO,BIOA,BIOX,BIP,BIPC,BIRK,BJ,BJRI,BK,BKD,BKE,BKH,BKKT,BKNG,BKR,BKSY,BKU,BKV,BL,BLBD,BLCO,BLD,BLDP,BLDR,BLFS,BLK,BLKB,BLLN,BLMN,BLND,BLNK,BLRX,BLSH,BLX,BLZE,BMA,BMBL,BMEA,BMI,BMNR,BMO,BMRC,BMRN,BMY,BN,BNC,BNED,BNKK,BNL,BNS,BNT,BNTC,BNTX,BOBS,BOC,BOH,BOKF,BOOM,BOOT,BORR,BOX,BP,BPOP,BR,BRAG,BRBR,BRBS,BRC,BRCB,BRCC,BRKR,BRLT,BRO,BROS,BRR,BRSL,BRSP,BRT,BRX,BRZE,BSAC,BSBR,BSET,BSM,BSRR,BSX,BSY,BTBT,BTCS,BTDR,BTE,BTG,BTGO,BTI,BTM,BTQ,BTSG,BTU,BUD,BULL,BUR,BURL,BUSE,BV,BVN,BVS,BW,BWA,BWAY,BWB,BWEN,BWIN,BWMN,BWMX,BWXT,BX,BXC,BXMT,BXP,BXSL,BY,BYD,BYND,BYRN,BYSI,BZ,BZAI,BZFD,BZH,BZUN,C,CAAP,CAAS,CABA,CAC,CACC,CACI,CADL,CAE,CAF,CAG,CAH,CAI,CAKE,CAL,CALC,CALM,CALX,CALY,CAMT,CAN,CAPL,CAPR,CAR,CARE,CARG,CARR,CARS,CART,CASH,CASS,CASY,CAT,CATO,CATX,CATY,CAVA,CB,CBAN,CBAT,CBC,CBL,CBLL,CBNK,CBOE,CBRE,CBRL,CBSH,CBT,CBU,CBUS,CBZ,CC,CCAP,CCB,CCBG,CCC,CCCC,CCEC,CCEP,CCI,CCJ,CCK,CCL,CCLD,CCNE,CCO,CCOI,CCRN,CCS,CCSI,CCU,CD,CDE,CDLX,CDNA,CDNS,CDP,CDRE,CDW,CDXS,CDZI,CE,CECO,CEG,CELC,CELH,CELU,CENN,CENT,CENTA,CENX,CEPO,CEPU,CERS,CERT,CEVA,CF,CFFN,CFG,CFR,CG,CGAU,CGBD,CGC,CGEM,CGEN,CGNT,CGNX,CGON,CHCO,CHCT,CHD,CHDN,CHE,CHEF,CHGG,CHH,CHKP,CHMI,CHPT,CHRD,CHRS,CHRW,CHT,CHTR,CHWY,CHYM,CI,CIA,CIB,CIEN,CIFR,CIG,CIGI,CIM,CINF,CING,CINT,CION,CIVB,CL,CLAR,CLB,CLBK,CLBT,CLDT,CLDX,CLF,CLFD,CLGN,CLH,CLIR,CLLS,CLMT,CLNE,CLOV,CLPR,CLPT,CLS,CLSK,CLVT,CLW,CLX,CLYM,CM,CMBT,CMC,CMCL,CMCM,CMCO,CMCSA,CME,CMG,CMI,CMP,CMPR,CMPS,CMPX,CMRC,CMRE,CMS,CMTG,CMTL,CNA,CNC,CNDT,CNH,CNI,CNK,CNM,CNMD,CNNE,CNO,CNOB,CNP,CNQ,CNR,CNS,CNTA,CNTB,CNTY,CNVS,CNX,CNXC,CNXN,COCO,CODI,CODX,COF,COGT,COHR,COHU,COIN,COKE,COLB,COLD,COLL,COLM,COMP,CON,COO,COOK,COP,COR,CORT,CORZ,COSM,COST,COTY,COUR,COYA,CP,CPA,CPAY,CPB,CPF,CPIX,CPK,CPNG,CPRI,CPRT,CPRX,CPS,CPSH,CPSS,CPT,CQP,CR,CRAI,CRBG,CRBP,CRBU,CRC,CRCL,CRCT,CRDF,CRDL,CRDO,CRESY,CRGY,CRH,CRI,CRK,CRL,CRM,CRMD,CRML,CRNC,CRNT,CRNX,CRON,CROX,CRS,CRSP,CRSR,CRTO,CRUS,CRVL,CRVS,CRWD,CRWS,CRWV,CSBR,CSCO,CSGP,CSGS,CSHR,CSIQ,CSL,CSR,CSTE,CSTL,CSTM,CSV,CSW,CSWC,CSX,CTAS,CTBI,CTEV,CTGO,CTKB,CTLP,CTMX,CTNM,CTO,CTOS,CTRA,CTRE,CTRI,CTRM,CTRN,CTS,CTSH,CTSO,CTVA,CTXR,CUBE,CUBI,CUE,CUK,CULP,CURB,CURI,CURV,CUZ,CVBF,CVCO,CVE,CVEO,CVGI,CVGW,CVI,CVLG,CVLT,CVNA,CVRX,CVS,CVSA,CVU,CVX,CW,CWAN,CWBC,CWCO,CWEN,CWH,CWK,CWST,CWT,CX,CXAI,CXDO,CXM,CXT,CXW,CYD,CYH,CYPH,CYRX,CYTK,CZNC,CZR,D,DAC,DAIO,DAKT,DAL,DAN,DAO,DAR,DASH,DAVA,DAVE,DB,DBD,DBI,DBRG,DBX,DC,DCBO,DCGO,DCH,DCI,DCO,DCOM,DCTH,DD,DDD,DDL,DDOG,DE,DEA,DECK,DEFT,DEI,DELL,DEO,DERM,DFDV,DFH,DFIN,DFTX,DG,DGICA,DGII,DGNX,DGX,DGXX,DH,DHC,DHI,DHR,DHT,DHX,DIBS,DIN,DINO,DIOD,DIS,DJT,DK,DKL,DKNG,DKS,DLB,DLHC,DLNG,DLO,DLPN,DLR,DLTH,DLTR,DLX,DMAC,DMLP,DMRC,DNA,DNLI,DNN,DNOW,DNTH,DNUT,DOC,DOCN,DOCS,DOCU,DOLE,DOMH,DOMO,DOO,DORM,DOUG,DOV,DOW,DOX,DPRO,DPZ,DQ,DRD,DRH,DRI,DRS,DRTS,DRVN,DSGN,DSGR,DSGX,DSL,DSP,DSX,DT,DTCX,DTE,DTIL,DTM,DUK,DUOL,DUOT,DV,DVA,DVN,DX,DXC,DXCM,DXLG,DXPE,DY,DYAI,DYN,DYNC,E,EA,EAF,EARN,EAT,EBAY,EBC,EBF,EBS,EC,ECG,ECL,ECPG,ECVT,ED,EDAP,EDIT,EDU,EE,EEFT,EEX,EFC,EFOR,EFSC,EFX,EFXT,EG,EGAN,EGBN,EGP,EGY,EH,EHAB,EHC,EHTH,EIG,EIX,EL,ELA,ELAN,ELDN,ELF,ELMD,ELME,ELS,ELTX,ELV,ELVA,ELVN,EMA,EMBC,EMBJ,EME,EMN,EMPD,EMR,ENB,ENGN,ENIC,ENLT,ENLV,ENOV,ENPH,ENR,ENS,ENSG,ENTA,ENTG,ENTX,ENVA,ENVX,EOG,EOLS,EOSE,EPAC,EPAM,EPC,EPD,EPM,EPR,EPRT,EPSN,EQ,EQBK,EQH,EQIX,EQNR,EQPT,EQR,EQT,EQX,ERAS,ERIC,ERIE,ERII,ERO,ES,ESAB,ESCA,ESE,ESI,ESLT,ESNT,ESPR,ESRT,ESS,ESTA,ESTC,ET,ETD,ETN,ETON,ETOR,ETR,ETSY,EU,EVC,EVCM,EVER,EVEX,EVGO,EVH,EVLV,EVMN,EVR,EVRG,EVTC,EVTL,EW,EWBC,EWCZ,EWTX,EXC,EXE,EXEL,EXFY,EXK,EXLS,EXP,EXPD,EXPE,EXPI,EXPO,EXR,EXTR,EYE,EYPT,EZPW,F,FA,FAF,FANG,FARM,FAST,FATE,FBIN,FBIO,FBIZ,FBK,FBNC,FBP,FBRT,FBRX,FC,FCBC,FCEL,FCF,FCFS,FCN,FCNCA,FCPT,FCX,FDMT,FDP,FDS,FDUS,FDX,FE,FEIM,FELE,FENC,FER,FERG,FET,FF,FFAI,FFBC,FFIC,FFIN,FFIV,FG,FGNX,FHB,FHI,FHN,FHTX,FIBK,FICO,FIG,FIGR,FIGS,FINV,FIP,FIS,FISI,FISV,FITB,FIVE,FIVN,FIX,FIZZ,FJET,FKWL,FLD,FLEX,FLG,FLGT,FLL,FLNA,FLNC,FLNG,FLO,FLR,FLS,FLUT,FLUX,FLWS,FLY,FLYW,FMAO,FMBH,FMC,FMNB,FMS,FMX,FN,FNB,FND,FNF,FNGR,FNKO,FNLC,FNV,FOA,FOR,FORA,FORM,FORR,FOSL,FOUR,FOX,FOXA,FOXF,FPH,FPI,FPS,FR,FRBA,FRHC,FRME,FRMI,FRMM,FRO,FROG,FRPT,FRSH,FRST,FRT,FSBC,FSK,FSLR,FSLY,FSM,FSP,FSS,FSTR,FSV,FTAI,FTCI,FTDR,FTEK,FTHM,FTI,FTK,FTNT,FTRE,FTS,FTV,FTW,FUBO,FUL,FULC,FULT,FUN,FUTU,FVCB,FVRR,FWDI,FWONA,FWONK,FWRD,FWRG,G,GABC,GAIA,GAIN,GALT,GAMB,GANX,GAP,GASS,GATX,GAU,GBCI,GBDC,GBFH,GBTG,GBX,GCMG,GCO,GCT,GD,GDDY,GDOT,GDRX,GDS,GDYN,GE,GEF,GEHC,GEL,GEMI,GEN,GENC,GENI,GEO,GEOS,GERN,GETY,GEV,GEVO,GFF,GFI,GFL,GFS,GGAL,GGB,GGG,GGR,GGRP,GH,GHI,GHM,GHRS,GIB,GIC,GIII,GIL,GILD,GILT,GIS,GKOS,GL,GLAD,GLBE,GLBS,GLIBK,GLNG,GLOB,GLP,GLPG,GLPI,GLRE,GLUE,GLW,GLXY,GM,GMAB,GME,GMED,GNE,GNK,GNL,GNLX,GNRC,GNSS,GNTX,GNW,GO,GOGO,GOLD,GOLF,GOOD,GOOG,GOOGL,GOOS,GORO,GOSS,GOTU,GPC,GPCR,GPGI,GPI,GPK,GPMT,GPN,GPOR,GPRE,GPRK,GPRO,GRAB,GRAL,GRBK,GRC,GRCE,GRDN,GRFS,GRMN,GRND,GRNT,GRO,GROV,GROW,GROY,GRPN,GRRR,GRWG,GS,GSAT,GSBC,GSBD,GSHD,GSIT,GSK,GSL,GSM,GT,GTE,GTES,GTIM,GTLB,GTLS,GTM,GTN,GTX,GTY,GURE,GVA,GWRE,GWRS,GWW,GXO,GYRE,H,HAE,HAFC,HAFN,HAIN,HAL,HALO,HAS,HASI,HAYW,HBAN,HBB,HBCP,HBIO,HBM,HBNC,HBT,HCA,HCAT,HCC,HCI,HCKT,HCM,HCSG,HD,HDB,HDSN,HE,HEI,HELE,HELP,HEPS,HESM,HFFG,HFWA,HG,HGTY,HGV,HHH,HIG,HII,HIMS,HIMX,HIPO,HITI,HIVE,HIW,HL,HLF,HLI,HLIO,HLIT,HLLY,HLMN,HLN,HLNE,HLT,HLX,HMC,HMN,HMY,HNGE,HNI,HNRG,HNST,HOFT,HOG,HOMB,HON,HOOD,HOPE,HOWL,HP,HPE,HPK,HPP,HPQ,HQY,HR,HRB,HRI,HRL,HRMY,HROW,HRTG,HRTX,HRZN,HSAI,HSBC,HSDT,HSIC,HST,HSTM,HSY,HTB,HTFL,HTGC,HTH,HTHT,HTLD,HTO,HTT,HTZ,HUBB,HUBG,HUBS,HUM,HUMA,HUN,HURN,HUT,HUYA,HVT,HWC,HWKN,HWM,HXL,HY,HYFT,HYLN,HYMC,HYPR,HZO,IAC,IAG,IART,IBCP,IBEX,IBKR,IBM,IBN,IBOC,IBP,IBRX,IBTA,ICE,ICFI,ICHR,ICL,ICLR,ICMB,ICUI,IDA,IDCC,IDN,IDR,IDT,IDXX,IDYA,IE,IEP,IESC,IEX,IFF,IFRX,IGC,IGIC,IHRT,IHS,III,IIIN,IIIV,IIPR,ILMN,ILPT,IMAX,IMCR,IMDX,IMKTA,IMMP,IMMR,IMMX,IMNM,IMO,IMOS,IMPP,IMRX,IMSR,IMTX,IMUX,IMVT,IMXI,INBK,INBX,INCR,INCY,INDB,INDI,INDV,INFQ,INFU,INFY,ING,INGM,INGN,INGR,INMB,INMD,INN,INNV,INO,INOD,INR,INSE,INSG,INSM,INSP,INSW,INTA,INTC,INTR,INTT,INTU,INV,INVA,INVE,INVH,INVX,INVZ,IONQ,IONS,IOSP,IOT,IOVA,IP,IPAR,IPGP,IPI,IPSC,IPX,IQ,IQV,IR,IRD,IRDM,IREN,IRIX,IRM,IRMD,IRON,IRS,IRT,IRTC,IRWD,ISOU,ISPR,ISRG,ISSC,IT,ITGR,ITP,ITRI,ITRN,ITT,ITUB,ITW,IVA,IVR,IVT,IVVD,IVZ,IXHL,IZEA,J,JACK,JAKK,JANX,JAZZ,JBGS,JBHT,JBI,JBIO,JBL,JBLU,JBS,JBSS,JBTM,JCI,JD,JEF,JELD,JFIN,JHG,JHX,JJSF,JKHY,JKS,JLL,JMIA,JMSB,JNJ,JOBY,JOE,JOYY,JPM,JRVR,JSPR,JXN,JYNT,KAI,KALU,KALV,KB,KBH,KBR,KC,KD,KDK,KDP,KE,KEEL,KELYA,KEN,KEP,KEX,KEY,KEYS,KFRC,KFS,KFY,KGC,KGS,KHC,KIDS,KIDZ,KIM,KINS,KKR,KLAC,KLAR,KLC,KLIC,KLTR,KLXE,KMB,KMDA,KMI,KMPR,KMT,KMX,KN,KNDI,KNF,KNOP,KNSA,KNSL,KNTK,KNX,KO,KOD,KODK,KOF,KOP,KOPN,KOS,KPTI,KR,KRC,KREF,KRG,KRMD,KRMN,KRNT,KRNY,KRO,KROS,KRP,KRRO,KRYS,KSPI,KSS,KT,KTB,KTCC,KTOS,KULR,KURA,KVHI,KVUE,KVYO,KW,KWR,KYIV,KYMR,KYN,KYTX,KZIA,KZR,L,LAB,LAC,LAD,LADR,LAES,LAKE,LAMR,LAND,LAR,LASE,LASR,LAUR,LAW,LAZ,LB,LBRDA,LBRDK,LBRT,LBTYA,LBTYK,LC,LCID,LCII,LCNB,LCTX,LCUT,LDI,LDOS,LE,LEA,LECO,LEG,LEGH,LEGN,LEN,LENZ,LESL,LEU,LEVI,LFCR,LFMD,LFST,LFUS,LFVN,LFWD,LGIH,LGN,LGND,LGO,LH,LHX,LI,LIF,LII,LILA,LILAK,LIN,LINC,LIND,LINE,LION,LITE,LITS,LIVN,LKFN,LKQ,LLY,LLYVA,LLYVK,LMAT,LMB,LMND,LMNR,LMT,LNAI,LNC,LNG,LNN,LNSR,LNT,LNTH,LOAN,LOAR,LOB,LOCO,LODE,LOGI,LOMA,LOOP,LOPE,LOVE,LOW,LPG,LPL,LPLA,LPRO,LPSN,LPTH,LPX,LQDA,LQDT,LRCX,LRMR,LRN,LSAK,LSCC,LSPD,LSTR,LTBR,LTC,LTH,LTM,LTRN,LTRX,LU,LUCK,LULU,LUMN,LUNG,LUNR,LUV,LUXE,LVO,LVS,LVWR,LW,LWLG,LX,LXEO,LXFR,LXP,LXRX,LXU,LYB,LYEL,LYFT,LYG,LYTS,LYV,LZ,LZB,LZM,M,MA,MAA,MAC,MAGN,MAIN,MAMA,MAN,MANH,MANU,MAR,MARA,MAS,MASI,MASS,MAT,MATV,MATW,MATX,MAX,MAZE,MBC,MBI,MBIN,MBLY,MBOT,MBUU,MBWM,MBX,MC,MCB,MCBS,MCD,MCFT,MCGA,MCHB,MCHP,MCHX,MCK,MCO,MCRB,MCRI,MCS,MCW,MCY,MD,MDB,MDGL,MDLN,MDLZ,MDT,MDU,MDWD,MDXG,MEC,MED,MEDP,MEG,MEI,MELI,MENS,MEOH,MERC,MESO,MET,META,METC,MFA,MFC,MFG,MFIC,MFIN,MG,MGA,MGEE,MGM,MGNI,MGNX,MGPI,MGRC,MGTX,MGY,MHK,MHO,MIAX,MICC,MIDD,MIR,MIRM,MIST,MITK,MITT,MKC,MKL,MKSI,MKTX,MLCO,MLI,MLKN,MLM,MLR,MLSS,MLTX,MLYS,MMED,MMLP,MMM,MMS,MMSI,MMYT,MNDO,MNDY,MNKD,MNOV,MNR,MNRO,MNSO,MNST,MNTK,MNTN,MNY,MO,MOB,MOD,MOH,MOMO,MORN,MOS,MOV,MP,MPAA,MPB,MPC,MPLX,MPT,MPWR,MPX,MQ,MRAM,MRCY,MRDN,MREO,MRK,MRLN,MRNA,MRP,MRSH,MRTN,MRVI,MRVL,MRX,MS,MSA,MSB,MSBI,MSCI,MSDL,MSEX,MSFT,MSGE,MSGS,MSI,MSM,MSTR,MT,MTA,MTB,MTCH,MTD,MTDR,MTG,MTH,MTLS,MTN,MTRN,MTRX,MTSI,MTUS,MTW,MTX,MTZ,MU,MUFG,MUR,MUSA,MUX,MVBF,MVIS,MVO,MVST,MWA,MX,MXCT,MXL,MYE,MYGN,MYO,MYPS,MYRG,MZTI,NA,NABL,NAGE,NAK,NAKA,NAMS,NAN,NAT,NATL,NATR,NAUT,NAVI,NAVN,NB,NBBK,NBHC,NBIS,NBIX,NBP,NBR,NBTB,NCLH,NCMI,NCNO,NDAQ,NDLS,NDSN,NE,NECB,NEE,NEM,NEO,NEOG,NEON,NEOV,NESR,NET,NEU,NEWP,NEWT,NEXA,NEXN,NEXT,NFBK,NFE,NFG,NFGC,NFLX,NG,NGEN,NGG,NGL,NGNE,NGS,NGVC,NGVT,NHC,NHI,NHTC,NI,NIC,NICE,NINE,NIO,NIQ,NIU,NJR,NKE,NKLR,NKTR,NKTX,NL,NLOP,NLY,NMAX,NMFC,NMG,NMIH,NMM,NMR,NMRA,NMRK,NMTC,NN,NNBR,NNDM,NNE,NNI,NNN,NNOX,NNVC,NOA,NOAH,NOC,NOG,NOK,NOMD,NOTV,NOV,NOVT,NOW,NPCE,NPKI,NPO,NPWR,NRC,NRDS,NRDY,NREF,NRG,NRGV,NRIX,NRP,NRT,NRXP,NSA,NSC,NSIT,NSP,NSPR,NSSC,NTAP,NTB,NTCT,NTES,NTGR,NTLA,NTNX,NTR,NTRA,NTRS,NTSK,NTST,NTWK,NU,NUAI,NUCL,NUE,NUS,NUVB,NUVL,NVA,NVAX,NVCR,NVCT,NVDA,NVGS,NVMI,NVNO,NVO,NVRI,NVS,NVST,NVT,NVTS,NVX,NWBI,NWE,NWG,NWL,NWN,NWPX,NWS,NWSA,NX,NXDR,NXDT,NXE,NXPI,NXRT,NXST,NXT,NYT,O,OABI,OBDC,OBE,OBIO,OBK,OC,OCFC,OCGN,OCS,OCSL,OCUL,ODD,ODFL,ODV,OEC,OFG,OFIX,OFRM,OFS,OGC,OGE,OGI,OGN,OGS,OHI,OI,OII,OIS,OKE,OKLO,OKTA,OLED,OLLI,OLMA,OLN,OLP,OLPX,OM,OMAB,OMC,OMCL,OMDA,OMER,OMEX,OMF,ON,ONB,ONC,ONDS,ONEW,ONIT,ONL,ONON,ONTO,OOMA,OPAD,OPAL,OPBK,OPCH,OPEN,OPFI,OPK,OPLN,OPRA,OPRT,OPRX,OPTT,OPTU,OPY,OR,ORA,ORBS,ORC,ORCL,ORGN,ORGO,ORI,ORIC,ORIO,ORKA,ORLA,ORLY,ORMP,ORN,ORRF,OSBC,OSCR,OSG,OSIS,OSK,OSPN,OSS,OSUR,OSW,OTEX,OTIS,OTLK,OTLY,OTTR,OUST,OUT,OVID,OVV,OWL,OWLT,OXM,OXSQ,OXY,OZK,P,PAA,PAAS,PACB,PACK,PACS,PAG,PAGP,PAGS,PAHC,PAL,PAM,PANL,PANW,PAR,PARR,PATH,PATK,PAVM,PAX,PAY,PAYC,PAYO,PAYP,PAYS,PAYX,PB,PBA,PBF,PBH,PBI,PBR,PBT,PBYI,PCAR,PCB,PCG,PCOR,PCRX,PCT,PCTY,PCVX,PCYO,PD,PDD,PDFS,PDLB,PDM,PDS,PDSB,PDYN,PEB,PEBO,PECO,PEG,PEGA,PEN,PENG,PENN,PEO,PEP,PEPG,PERI,PESI,PETS,PEW,PFBC,PFE,PFG,PFGC,PFLT,PFS,PFSI,PG,PGC,PGEN,PGNY,PGR,PGY,PH,PHAT,PHG,PHIN,PHM,PHR,PHUN,PHVS,PI,PII,PINE,PINS,PIPR,PJT,PK,PKBK,PKE,PKG,PKOH,PKST,PKX,PL,PLAB,PLAY,PLBY,PLCE,PLD,PLG,PLMR,PLNT,PLOW,PLRX,PLSE,PLTK,PLTR,PLUG,PLUS,PLX,PLXS,PM,PMCB,PMT,PMVP,PNC,PNFP,PNNT,PNR,PNTG,PNW,PODD,POET,PONY,POOL,POR,POST,POWI,POWL,POWW,PPBT,PPC,PPG,PPIH,PPL,PPSI,PPTA,PR,PRA,PRAA,PRAX,PRCH,PRCT,PRDO,PRE,PRG,PRGO,PRGS,PRI,PRIM,PRK,PRKS,PRLB,PRLD,PRM,PRMB,PRME,PROF,PROK,PROP,PRPL,PRQR,PRSU,PRTA,PRTH,PRTS,PRU,PRVA,PS,PSA,PSEC,PSFE,PSIX,PSKY,PSMT,PSN,PSNL,PSNY,PSO,PSQH,PSTL,PSX,PTC,PTCT,PTEN,PTGX,PTLO,PTON,PTRN,PUBM,PUK,PUMP,PURR,PVH,PVL,PVLA,PWP,PWR,PYPD,PYPL,PYXS,PZZA,Q,QBTS,QCOM,QCRH,QDEL,QFIN,QGEN,QLYS,QNCX,QNST,QRHC,QRVO,QS,QSI,QSR,QTRX,QTWO,QUAD,QUBT,QUIK,QURE,QXO,R,RACE,RAIL,RAL,RAMP,RANI,RAPP,RARE,RAVE,RBA,RBB,RBBN,RBC,RBCAA,RBLX,RBRK,RC,RCAT,RCEL,RCI,RCKT,RCL,RCON,RCUS,RDDT,RDI,RDN,RDNT,RDNW,RDVT,RDW,RDWR,RDY,REAL,REAX,REE,REFI,REFR,REG,REGN,REI,REKR,RELL,RELX,RELY,REPL,REPX,RES,REX,REXR,REYN,REZI,RF,RFIL,RFL,RGA,RGC,RGCO,RGEN,RGLD,RGNX,RGP,RGR,RGTI,RH,RHI,RHP,RICK,RIG,RIGL,RILY,RIO,RIOT,RITM,RIVN,RJF,RKLB,RKT,RL,RLAY,RLGT,RLI,RLJ,RLMD,RLX,RM,RMAX,RMBS,RMD,RMNI,RMR,RMTI,RNA,RNAC,RNG,RNGR,RNR,RNST,RNW,ROAD,ROCK,ROG,ROIV,ROK,ROKU,ROL,ROOT,ROP,ROST,RPAY,RPC,RPD,RPM,RPRX,RPT,RR,RRC,RRGB,RRR,RRX,RS,RSG,RSI,RSKD,RSVR,RTO,RTX,RUM,RUN,RUSHA,RVLV,RVMD,RVP,RVPH,RVSB,RVTY,RWAY,RWT,RXO,RXRX,RXST,RXT,RY,RYAAY,RYAM,RYAN,RYN,RYTM,RYZ,RZLT,RZLV,S,SA,SABR,SABS,SACH,SAFE,SAFT,SAH,SAIA,SAIC,SAIL,SAM,SAMG,SAN,SANA,SANM,SAP,SAR,SARO,SATA,SATL,SATS,SB,SBAC,SBCF,SBET,SBGI,SBH,SBLK,SBRA,SBS,SBSI,SBSW,SBUX,SCCO,SCHL,SCHW,SCI,SCL,SCM,SCSC,SCVL,SCYX,SD,SDGR,SDRL,SE,SEDG,SEER,SEG,SEI,SEIC,SELF,SEM,SENS,SEPN,SERA,SERV,SES,SEV,SEVN,SEZL,SF,SFBS,SFD,SFIX,SFL,SFM,SFNC,SFST,SG,SGC,SGHC,SGHT,SGI,SGML,SGMO,SGMT,SGRY,SGU,SHAK,SHBI,SHC,SHEL,SHEN,SHG,SHIP,SHLS,SHO,SHOO,SHOP,SHW,SIBN,SID,SIDU,SIEB,SIFY,SIG,SIGA,SIGI,SII,SILA,SIMO,SION,SIRI,SITC,SITE,SITM,SJM,SJT,SKE,SKIN,SKLZ,SKM,SKT,SKWD,SKY,SKYE,SKYH,SKYT,SKYW,SLAB,SLAI,SLB,SLDB,SLDE,SLDP,SLF,SLG,SLGN,SLI,SLM,SLN,SLNO,SLP,SLQT,SLRC,SLS,SLSR,SLVM,SM,SMA,SMBC,SMBK,SMC,SMCI,SMFG,SMG,SMHI,SMMT,SMP,SMPL,SMR,SMRT,SMSI,SMTC,SMWB,SMX,SN,SNA,SNAP,SNBR,SNCY,SND,SNDA,SNDK,SNDL,SNDR,SNDX,SNEX,SNN,SNOW,SNPS,SNX,SNY,SO,SOBO,SOC,SOFI,SOGP,SOHU,SOLS,SOLV,SON,SONO,SONY,SOPH,SOUN,SPAI,SPB,SPCE,SPFI,SPG,SPGI,SPH,SPHR,SPIR,SPNT,SPOK,SPOT,SPRO,SPRU,SPRY,SPSC,SPT,SPWH,SPXC,SQM,SQNS,SR,SRAD,SRCE,SRE,SRG,SRI,SRL,SRPT,SRRK,SRTA,SRTS,SSB,SSD,SSL,SSNC,SSP,SSRM,SSSS,SSTI,SSTK,SSYS,ST,STAA,STAG,STBA,STC,STE,STEM,STEP,STEX,STGW,STHO,STIM,STKE,STKL,STKS,STLA,STLD,STM,STN,STNE,STNG,STOK,STRA,STRC,STRD,STRF,STRL,STRO,STRZ,STSS,STT,STTK,STUB,STVN,STWD,STX,STXS,STZ,SU,SUI,SUIG,SUN,SUNB,SUNC,SUNS,SUPN,SUPV,SURG,SUZ,SVC,SVM,SVRA,SVV,SW,SWBI,SWIM,SWK,SWKS,SWX,SXC,SXI,SXT,SY,SYBT,SYF,SYK,SYM,SYNA,SYPR,SYRE,SYY,T,TAC,TACT,TAK,TAL,TALK,TALO,TAP,TARA,TARS,TASK,TBBB,TBBK,TBCH,TBI,TBLA,TBPH,TBRG,TCBI,TCBK,TCBX,TCMD,TCOM,TCPC,TCX,TD,TDAY,TDC,TDG,TDOC,TDS,TDUP,TDW,TDY,TE,TEAD,TEAM,TECH,TECK,TECX,TEL,TELA,TEM,TEN,TENB,TENX,TEO,TER,TERN,TEVA,TEX,TFC,TFII,TFIN,TFPM,TFSL,TFX,TG,TGB,TGEN,TGLS,TGS,TGT,TGTX,TH,THC,THCH,THFF,THG,THO,THR,THRM,THRY,TIC,TIGO,TIGR,TII,TILE,TIMB,TIPT,TITN,TJX,TK,TKC,TKNO,TKO,TKR,TLN,TLPH,TLRY,TLS,TLSA,TLYS,TM,TMC,TMCI,TMDX,TME,TMHC,TMO,TMP,TMQ,TMUS,TNC,TNDM,TNET,TNGX,TNK,TNL,TNXP,TNYA,TOI,TOL,TONX,TOON,TORO,TOST,TOUR,TOWN,TPB,TPC,TPG,TPH,TPL,TPR,TPVG,TR,TRAK,TRC,TRDA,TREE,TREX,TRGP,TRI,TRIB,TRIN,TRIP,TRMB,TRMD,TRMK,TRN,TRNO,TRNS,TRON,TROO,TROW,TROX,TRP,TRS,TRST,TRTX,TRU,TRUP,TRV,TRVG,TRVI,TRX,TS,TSAT,TSBK,TSCO,TSEM,TSHA,TSLA,TSLX,TSM,TSN,TSQ,TSSI,TT,TTAM,TTAN,TTC,TTD,TTE,TTEC,TTEK,TTGT,TTI,TTMI,TTWO,TU,TUSK,TUYA,TV,TVRD,TVTX,TW,TWI,TWIN,TWLO,TWO,TWST,TX,TXG,TXMD,TXN,TXNM,TXO,TXRH,TXT,TYL,TYRA,TZOO,U,UA,UAA,UAL,UAMY,UAN,UBER,UBS,UBSI,UCB,UCTT,UDMY,UDR,UE,UEC,UEIC,UFCS,UFI,UFPI,UFPT,UGI,UGP,UGRO,UHAL,UHS,UHT,UIS,UL,ULCC,ULS,ULTA,UMAC,UMBF,UMC,UMH,UNCY,UNF,UNFI,UNH,UNIT,UNM,UNP,UNTY,UONE,UP,UPB,UPBD,UPLD,UPS,UPST,UPWK,UPXI,URBN,URGN,URI,UROY,USAC,USAR,USAS,USAU,USB,USFD,USIO,USLM,USNA,USPH,UTHR,UTI,UTL,UTZ,UUUU,UVE,UVSP,UVV,UWMC,V,VAC,VAL,VALE,VANI,VBNK,VC,VCEL,VCTR,VCX,VCYT,VECO,VEEV,VEL,VELO,VENU,VEON,VERA,VERI,VERU,VERX,VET,VFC,VFF,VFS,VG,VGNT,VGZ,VIA,VIAV,VICI,VICR,VIK,VINP,VIPS,VIR,VIRC,VIRT,VISN,VIST,VITL,VIV,VIVO,VKTX,VLN,VLO,VLRS,VLTO,VLY,VMC,VMD,VMI,VNDA,VNET,VNO,VNOM,VNRX,VNT,VOC,VOD,VOXR,VOYA,VOYG,VPG,VRA,VRDN,VRE,VREX,VRNS,VRRM,VRSK,VRSN,VRT,VRTX,VSAT,VSCO,VSEC,VSH,VSNT,VST,VSTM,VSTS,VTEX,VTGN,VTOL,VTR,VTRS,VTS,VTSI,VUZI,VVV,VVX,VWAV,VYGR,VYX,VZ,VZLA,W,WAB,WABC,WAFD,WAL,WASH,WAT,WAY,WB,WBD,WBI,WBS,WBTN,WBX,WCC,WCN,WD,WDAY,WDC,WDFC,WDS,WEAV,WEC,WELL,WEN,WERN,WES,WEST,WEX,WFC,WFG,WFRD,WGO,WGS,WH,WHD,WHF,WHG,WHR,WHWK,WIMI,WING,WIT,WIX,WK,WKC,WLAC,WLDN,WLK,WLKP,WLTH,WLY,WM,WMB,WMG,WMK,WMS,WMT,WNC,WNEB,WOLF,WOOF,WOR,WPC,WPM,WPP,WPRT,WRAP,WRB,WRBY,WRD,WS,WSBC,WSBF,WSC,WSFS,WSM,WSO,WSR,WST,WT,WTBA,WTFC,WTI,WTRG,WTS,WTTR,WTW,WU,WULF,WVE,WW,WWD,WWR,WWW,WY,WYFI,WYNN,WYY,XBIT,XE,XEL,XENE,XERS,XGN,XHR,XIFR,XMTR,XNCR,XNDU,XNET,XOM,XOMA,XP,XPEL,XPER,XPEV,XPO,XPOF,XPRO,XRAY,XRN,XRX,XXI,XYL,XYZ,YALA,YELP,YETI,YEXT,YMM,YORW,YOU,YPF,YQ,YRD,YSG,YSS,YUM,YUMC,Z,ZBH,ZBIO,ZBRA,ZD,ZDGE,ZENA,ZEPP,ZETA,ZG,ZGN,ZH,ZIM,ZION,ZIP,ZLAB,ZM,ZNTL,ZS,ZTO,ZTS,ZUMZ,ZURA,ZVIA,ZVRA,ZWS,ZYME",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-576, 96],
+      "id": "d5a01bcf-7d97-43fc-ae0c-e4aa9c15d54b",
+      "name": "Us Stocks"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node - input is the STRING directly\nconst tickersString = $input.first().json.tickers;  // or just $json.tickers\n\nconst output = tickersString\n  .split(\",\")\n  .map(ticker => ({ ticker: ticker.trim() }));\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-336, 224],
+      "id": "a75dd8e8-82bf-4685-b8d1-f3a83f4af094",
+      "name": "Step2 : Split Comma-Separated Tickers"
+    },
+    {
+      "parameters": {
+        "url": "=http://yfinance-wrapper:7000/stockmetrics?tickers={{$json.ticker}}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-112, 224],
+      "id": "44723305-f544-4578-ae7d-062736e5b877",
+      "name": "Step 3: Http Request to fetch the price and some info about tickers"
+    },
+    {
+      "parameters": {
+        "jsCode": "const processed = [];\n\nfor (const item of $input.all()) {\n  // Handle nested results array\n  if (item.json.results && Array.isArray(item.json.results)) {\n    for (const result of item.json.results) {\n      const rawPrice = String(result.price ?? \"\").replace(/[$,]/g, \"\");\n      const price = parseFloat(rawPrice);\n\n      // Only add if price is valid and in range\n      if (result.ticker && !isNaN(price) && price >= 15 && price <= 60) {\n        processed.push({\n          json: {\n            ticker: result.ticker,\n            price,\n            ivCurrent: result.ivCurrent,\n            ivRank: result.ivRank,\n            iv52wkLow: result.iv52wkLow,\n            iv52wkHigh: result.iv52wkHigh,\n            ivChange: result.ivChange,\n            ivDirection: result.ivDirection,\n            rv30d: result.rv30d,\n            vrp: result.vrp,\n            vrpSignal: result.vrpSignal,\n            callOI: result.callOI,\n            putOI: result.putOI,\n            callVolume: result.callVolume,\n            putVolume: result.putVolume,\n            putCallRatioOI: result.putCallRatioOI,\n            putCallRatioVolume: result.putCallRatioVolume,\n            putCallSignal: result.putCallSignal\n          }\n        });\n      }\n    }\n  }\n}\n\nreturn processed;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [80, 224],
+      "id": "737ff8d4-8ace-4b40-a5fd-5a6fdd11ac94",
+      "name": "Step4 :Filter Stocks by price Range"
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all();\nconst results = [];\n\nfor (const item of all) {\n  // handle both {results: [...]} and flat array\n  const raw = item.json.results || [item.json];\n\n  for (const x of raw) {\n    if (!x.ticker || x.error) continue;\n\n    let score = 0;\n\n    // ── 1. IV RANK (0-30 points) ──────────────────────────────────\n    // Higher IV rank = options more expensive = better premium to sell\n    // Sweet spot: 30-80 (not too low, not at extreme peak)\n    const ivRank = x.ivRank ?? 0;\n    if (ivRank >= 50) score += 30;\n    else if (ivRank >= 30) score += 22;\n    else if (ivRank >= 15) score += 12;\n    else score += 0;\n\n    // ── 2. VRP — IV vs RV (0-25 points) ──────────────────────────\n    // Positive VRP = IV overpriced vs realized moves = sell premium\n    const vrp = x.vrp ?? 0;\n    if (vrp >= 0.15) score += 25;\n    else if (vrp >= 0.08) score += 18;\n    else if (vrp >= 0.03) score += 10;\n    else if (vrp > 0) score += 4;\n    else score += 0; // negative VRP = IV cheap = not ideal for selling\n\n    // ── 3. IV DIRECTION (0-15 points) ────────────────────────────\n    // Rising IV = options getting more expensive = better time to sell\n    if (x.ivDirection === \"rising\") score += 15;\n    else if (x.ivDirection === \"falling\") score += 0;\n\n    // ── 4. PUT/CALL SIGNAL (0-15 points) ─────────────────────────\n    // Bullish put/call = more call activity = stock sentiment positive\n    if (x.putCallSignal === \"bullish\") score += 15;\n    else if (x.putCallSignal === \"neutral\") score += 7;\n    else score += 0; // bearish\n\n    // ── 5. CURRENT IV LEVEL (0-10 points) ────────────────────────\n    // Higher absolute IV = fatter premiums on covered calls\n    const iv = x.ivCurrent ?? 0;\n    if (iv >= 0.60) score += 10;\n    else if (iv >= 0.40) score += 8;\n    else if (iv >= 0.25) score += 5;\n    else if (iv >= 0.15) score += 2;\n    else score += 0;\n\n    // ── 6. LIQUIDITY (0-5 points) ─────────────────────────────────\n    // High call OI = liquid options = tighter spreads = easier to trade\n    const callOI = x.callOI ?? 0;\n    if (callOI >= 100000) score += 5;\n    else if (callOI >= 50000) score += 4;\n    else if (callOI >= 10000) score += 2;\n    else score += 0;\n\n    // clamp 0-100\n    score = Math.max(0, Math.min(100, score));\n\n    results.push({\n      json: {\n        ticker:              x.ticker,\n        price:               x.price,\n        score:               score,\n        ivRank:              x.ivRank,\n        ivCurrent:           x.ivCurrent,\n        ivDirection:         x.ivDirection,\n        ivChange:            x.ivChange,\n        rv30d:               x.rv30d,\n        vrp:                 x.vrp,\n        vrpSignal:           x.vrpSignal,\n        putCallRatioOI:      x.putCallRatioOI,\n        putCallRatioVolume:  x.putCallRatioVolume,\n        putCallSignal:       x.putCallSignal,\n        callOI:              x.callOI,\n        putOI:               x.putOI,\n        callVolume:          x.callVolume,\n        putVolume:           x.putVolume,\n        // human-readable signals\n        signal: (\n          x.vrpSignal === \"sell_premium\" && x.ivDirection === \"rising\"\n            ? \"STRONG_SELL_PREMIUM\"\n            : x.vrpSignal === \"sell_premium\"\n            ? \"SELL_PREMIUM\"\n            : x.ivDirection === \"rising\"\n            ? \"WATCH\"\n            : \"SKIP\"\n        )\n      }\n    });\n  }\n}\n\n// sort highest score first\nresults.sort((a, b) => b.json.score - a.json.score);\n\n// return top 20\nreturn results.slice(0, 40);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [272, 224],
+      "id": "dd41552d-55ca-4f5d-b756-99a4ba1789cf",
+      "name": "Step 5:Select the top 10 ranked tickers"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tickers = $input.all().map(item => item.json.ticker).join(\",\");\n\nreturn [{ json: { tickers } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [448, 192],
+      "id": "8fc3b921-2aa0-430b-afa0-0f71ce5bbd70",
+      "name": "Step 6:Final ticker string (packaging)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tickers = $input.first().json.tickers.split(\",\");\n\nreturn tickers.map(t => ({\n  json: { ticker: t.trim().toUpperCase() }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [624, 192],
+      "id": "1e3925dc-c274-4f73-8d8f-222b0462bebd",
+      "name": "Step 6:Final ticker preparing for next Api "
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [800, 224],
+      "id": "8b651dc6-a007-4671-9352-4f15151e235a",
+      "name": "Step 7: Wait Node",
+      "webhookId": "c422a93a-957f-4da8-955b-b6334989a532"
+    },
+    {
+      "parameters": {
+        "url": "http://yfinance-wrapper:7000/chain",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ticker",
+              "value": "={{$json.ticker}}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [976, 224],
+      "id": "a5561896-6e74-4632-840d-d6526beb6fbf",
+      "name": "Step 8: HTTP Request: Options‑chain API"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of items) {\n  const data   = item.json;\n  const ticker = data.ticker;\n  const spot   = Number(data.spotPrice) || 0;\n  const calls  = Array.isArray(data.calls) ? data.calls : [];\n\n  if (!spot || calls.length === 0) {\n    results.push({\n      json: {\n        ticker,\n        reason:    \"Missing spot price or no calls returned\",\n        spotPrice: spot,\n        callCount: calls.length,\n      },\n    });\n    continue;\n  }\n\n  for (const call of calls) {\n    const strike = Number(call.strike) || 0;\n    const bid    = Number(call.bid ?? 0);\n    const ask    = Number(call.ask ?? 0);\n    const oi     = Number(call.openInterest ?? 0);\n    const volume = Number(call.volume ?? 0);\n    const iv     = Number(call.impliedVolatility ?? 0);\n\n    // basic filters\n    if (!strike) continue;\n    if (strike < spot) continue;\n\n    // choose premium: prefer ask, then bid\n    const premium = ask || bid || 0;\n    if (premium <= 0) continue;\n\n    // core ratios (keep as pure numbers here)\n    const premiumYield = spot > 0 ? `${((premium / spot) * 100).toFixed(1)}%` : \"0.0%\";            // e.g. 0.10 = 10%\n    \n    const upsidePct = spot > 0 ? `${(((strike - spot) / spot) * 100).toFixed(1)}%` : \"0.0%\";    // 0.13 = 13% upside\n    \n    const totalIfCalled = spot > 0 ? `${(((premium / spot)  + ((strike - spot) / spot)) * 100).toFixed(1)}%` :\"0.0%\" ;                 // 0.23 = 23%\n\n    // bid/ask spread as fraction (0.2 = 20%) or null if not computable\n    const spreadPct = (ask > 0 && bid > 0)\n      ? `${(((ask - bid) / ask) * 100).toFixed(1)}%`\n      : null;\n\n    results.push({\n      json: {\n        ticker,\n        expir:             call.expiration || null,\n        spotPrice:         spot,\n        strike,\n        bid,\n        ask,\n        premium,\n        premiumYield,      // ratio, not formatted\n        upsidePct,         // ratio, not formatted\n        totalIfCalled,     // ratio, not formatted\n        openInterest:      oi,\n        volume,\n        impliedVolatility: `${iv.toFixed(2)}%`,\n        spreadPct,         // ratio (e.g. 0.8 = 80%), not formatted\n      },\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1168, 224],
+      "id": "60de2e6c-cd8e-4053-b0a9-a07f104c7aa9",
+      "name": "Step 9: Call‑option analyser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n\nreturn $input.all().map(item => {\n  const x = item.json;\n\n  const spot    = Number(x.spotPrice || 0);\n  const strike  = Number(x.strike    || 0);\n  const bid     = Number(x.bid       || 0);\n  const ask     = Number(x.ask       || 0);\n  const oi      = Number(x.openInterest || 0);\n  const volume  = Number(x.volume    || 0);\n  const iv      = Number(x.impliedVolatility || 0);\n  const premium = bid > 0 ? bid : ask;\n\n  const dte = x.expir\n    ? Math.ceil((new Date(x.expir) - now) / (1000 * 60 * 60 * 24))\n    : null;\n\n  const breakeven        = Number((spot - premium).toFixed(2));\n  const breakevenDropPct = Number((premium / spot * 100).toFixed(2));\n  const profitIfOTM_usd  = Number((premium * 100).toFixed(2));\n  const profitIfITM_usd  = Number(((strike - spot + premium) * 100).toFixed(2));\n  const maxLoss_usd      = Number(((spot - premium) * 100).toFixed(2));\n  const riskReward       = maxLoss_usd > 0 ? Number((profitIfITM_usd / maxLoss_usd).toFixed(4)) : null;\n  const liquidityScore   = Number((Math.min(oi / 500, 5) + Math.min(volume / 100, 5)).toFixed(2));\n  const spreadPct        = ask > 0 ? Number(((ask - bid) / ask * 100).toFixed(2)) : null;\n  const premiumYieldPct  = Number((premium / spot * 100).toFixed(4));\n\n  let qualityTag = \"SKIP\";\n if (\n  breakevenDropPct >= 2 &&\n  spreadPct !== null &&\n  spreadPct <= 30 &&\n  oi >= 100 &&\n  volume >= 20 &&\n  premiumYieldPct >= 0.5\n) {\n  qualityTag = \"GOOD\";\n}\n\nif (\n  breakevenDropPct >= 3 &&\n  spreadPct !== null &&\n  spreadPct <= 20 &&\n  oi >= 200 &&\n  volume >= 50 &&\n  premiumYieldPct >= 1\n) {\n  qualityTag = \"STRONG\";\n}\n\n  return {\n    json: {\n      // ── Identity ──────────────────────────────────\n      ticker:               x.ticker,\n      expiry:               x.expir,\n      daysToExpiry:         dte,\n      currentStockPrice:    spot,\n      strikePrice:          strike,\n\n      // ── Core metrics ──────────────────────────────\n      premiumReceived:      premium,\n      breakevenPrice:       breakeven,\n      stockCanDropBy:       `${breakevenDropPct}%`,\n\n      // ── Profit scenarios ──────────────────────────\n      profitIfStockStaysFlat:    `$${profitIfOTM_usd}`,\n      profitIfStockAboveStrike:   `$${profitIfITM_usd}`,\n      worstCaseLoss:             `$${maxLoss_usd}`,\n\n      // ── Risk ──────────────────────────────────────\n      rewardVsRisk:         riskReward,\n\n      // ── Liquidity ─────────────────────────────────\n      liquidityScore:       liquidityScore,\n      openInterest:         oi,\n      volume,\n\n      // ── Verdict ───────────────────────────────────\n      rating:               qualityTag,\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 224],
+      "id": "1aaac227-1c3c-4279-9a3a-172ad082a247",
+      "name": "Step 10: Covered‑call quality engine"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter(item => {\n    const days = Number(item.json.daysToExpiry);\n    return days >= 0 && days <= 100;\n  })\n  .map(item => ({ json: item.json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, 48],
+      "id": "fa1076ec-851d-42c3-ac7b-2290e19df105",
+      "name": "Step 11: 0-100 days expiry"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter(item => {\n    const days = Number(item.json.daysToExpiry);\n    return days > 100 && days <= 365;\n  })\n  .map(item => ({ json: item.json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, 224],
+      "id": "e00d02d5-3fe7-4f74-8f5c-537cc345db14",
+      "name": "Step 11:100-365 days of expiry"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter(item => {\n    const days = Number(item.json.daysToExpiry);\n    return days > 365 && days <= 900;\n  })\n  .map(item => ({ json: item.json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, 400],
+      "id": "79d9f6a0-83f9-4773-898a-241e4daa80cb",
+      "name": "Step 11:365-900 days of expiry"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => item.json.rating === \"STRONG\");"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1824, 48],
+      "id": "ede87711-9b14-46be-979e-208555bfb540",
+      "name": "Step 12: Filter by strong rank"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => item.json.rating === \"STRONG\");"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1824, 224],
+      "id": "57b5a70f-b99c-4058-bc43-9316c55e401a",
+      "name": "Step 12: Filter by strong rank1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => item.json.rating === \"STRONG\");"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1824, 400],
+      "id": "df4f611d-c23f-45c7-842a-f9a01fd32a91",
+      "name": "Step 12: Filter by strong rank2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .map(item => {\n    const r = item.json;\n    const reward = Number(r.profitIfStockStaysFlat?.replace(\"$\", \"\") || 0) || 0;\n    const risk   = Number(r.worstCaseLoss?.replace(\"$\", \"\") || 0) || 0;\n\n    const ror = risk > 0 ? reward / risk : 0;\n\n    const rewardVsRiskNumeric = ror;\n    const rewardVsRiskRatio   = `${rewardVsRiskNumeric.toFixed(2)} : 1`;\n    const rewardVsRiskPercent = `${(rewardVsRiskNumeric * 100).toFixed(1)}%`;\n\n    return {\n      ...r,\n      reward,\n      risk,\n      rewardVsRisk:        rewardVsRiskNumeric,\n      rewardVsRiskRatio,   // \"0.08 : 1\"\n      rewardVsRiskPercent  // \"8.2%\"\n    };\n  })\n  .sort((a, b) => b.rewardVsRisk - a.rewardVsRisk)\n  .slice(0, 10)\n  .map(row => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2112, 48],
+      "id": "b70f1034-e986-4a05-a48e-b3b50980d89e",
+      "name": "Step 13: Reward‑vs‑risk ranker"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .map(item => {\n    const r = item.json;\n    const reward = Number(r.profitIfStockStaysFlat?.replace(\"$\", \"\") || 0) || 0;\n    const risk   = Number(r.worstCaseLoss?.replace(\"$\", \"\") || 0) || 0;\n\n    const ror = risk > 0 ? reward / risk : 0;\n\n    const rewardVsRiskNumeric = ror;\n    const rewardVsRiskRatio   = `${rewardVsRiskNumeric.toFixed(2)} : 1`;\n    const rewardVsRiskPercent = `${(rewardVsRiskNumeric * 100).toFixed(1)}%`;\n\n    return {\n      ...r,\n      reward,\n      risk,\n      rewardVsRisk:        rewardVsRiskNumeric,\n      rewardVsRiskRatio,   // \"0.08 : 1\"\n      rewardVsRiskPercent  // \"8.2%\"\n    };\n  })\n  .sort((a, b) => b.rewardVsRisk - a.rewardVsRisk)\n  .slice(0, 10)\n  .map(row => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2112, 224],
+      "id": "57aa3bfd-f87d-4223-9cad-f449cfe132b4",
+      "name": "Step 13: Reward‑vs‑risk ranker1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .map(item => {\n    const r = item.json;\n    const reward = Number(r.profitIfStockStaysFlat?.replace(\"$\", \"\") || 0) || 0;\n    const risk   = Number(r.worstCaseLoss?.replace(\"$\", \"\") || 0) || 0;\n\n    const ror = risk > 0 ? reward / risk : 0;\n\n    const rewardVsRiskNumeric = ror;\n    const rewardVsRiskRatio   = `${rewardVsRiskNumeric.toFixed(2)} : 1`;\n    const rewardVsRiskPercent = `${(rewardVsRiskNumeric * 100).toFixed(1)}%`;\n\n    return {\n      ...r,\n      reward,\n      risk,\n      rewardVsRisk:        rewardVsRiskNumeric,\n      rewardVsRiskRatio,   // \"0.08 : 1\"\n      rewardVsRiskPercent  // \"8.2%\"\n    };\n  })\n  .sort((a, b) => b.rewardVsRisk - a.rewardVsRisk)\n  .slice(0, 10)\n  .map(row => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2112, 400],
+      "id": "6abeed6f-718b-4b17-b4a3-1f76f66460ca",
+      "name": "Step 13: Reward‑vs‑risk ranker2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst chatInput = JSON.stringify(items, null, 2);\nreturn [{ json: { chatInput } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2336, 48],
+      "id": "2cdcb708-f1b5-400b-8788-57db2489b263",
+      "name": "Step 14: AI‑ready JSON packager"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst chatInput = JSON.stringify(items, null, 2);\nreturn [{ json: { chatInput } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2352, 224],
+      "id": "939e8bf8-1663-47bd-81f6-1fa5d928c944",
+      "name": "Step 14: AI‑ready JSON packager1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst chatInput = JSON.stringify(items, null, 2);\nreturn [{ json: { chatInput } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2352, 400],
+      "id": "b352c662-e199-4ac4-b64f-372eb4183ab2",
+      "name": "Step 14: AI‑ready JSON packager2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Us Stocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [[]]
+    },
+    "Step 2 Extract from file": {
+      "main": [
+        [
+          {
+            "node": "Step 3 Filter by Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3 Filter by Price": {
+      "main": [[]]
+    },
+    "LLM analysis": {
+      "main": [
+        [
+          {
+            "node": "Format AI output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM analysis1": {
+      "main": [
+        [
+          {
+            "node": "Format AI output1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM analysis2": {
+      "main": [
+        [
+          {
+            "node": "Format AI output2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI output": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI output1": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI output2": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "test tickers": {
+      "main": [[]]
+    },
+    "Google Gemini Chat Model Gemini 3.1 flash lite": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2 gemini3.1 preview tts": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM analysis2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1 gemini 3 flash preview": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM analysis1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Us Stocks": {
+      "main": [
+        [
+          {
+            "node": "Step2 : Split Comma-Separated Tickers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step2 : Split Comma-Separated Tickers": {
+      "main": [
+        [
+          {
+            "node": "Step 3: Http Request to fetch the price and some info about tickers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3: Http Request to fetch the price and some info about tickers": {
+      "main": [
+        [
+          {
+            "node": "Step4 :Filter Stocks by price Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step4 :Filter Stocks by price Range": {
+      "main": [
+        [
+          {
+            "node": "Step 5:Select the top 10 ranked tickers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 5:Select the top 10 ranked tickers": {
+      "main": [
+        [
+          {
+            "node": "Step 6:Final ticker string (packaging)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 6:Final ticker string (packaging)": {
+      "main": [
+        [
+          {
+            "node": "Step 6:Final ticker preparing for next Api ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 6:Final ticker preparing for next Api ": {
+      "main": [
+        [
+          {
+            "node": "Step 7: Wait Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 7: Wait Node": {
+      "main": [
+        [
+          {
+            "node": "Step 8: HTTP Request: Options‑chain API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 8: HTTP Request: Options‑chain API": {
+      "main": [
+        [
+          {
+            "node": "Step 9: Call‑option analyser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 9: Call‑option analyser": {
+      "main": [
+        [
+          {
+            "node": "Step 10: Covered‑call quality engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 10: Covered‑call quality engine": {
+      "main": [
+        [
+          {
+            "node": "Step 11: 0-100 days expiry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Step 11:100-365 days of expiry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Step 11:365-900 days of expiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 11: 0-100 days expiry": {
+      "main": [
+        [
+          {
+            "node": "Step 12: Filter by strong rank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 11:100-365 days of expiry": {
+      "main": [
+        [
+          {
+            "node": "Step 12: Filter by strong rank1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 11:365-900 days of expiry": {
+      "main": [
+        [
+          {
+            "node": "Step 12: Filter by strong rank2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 12: Filter by strong rank": {
+      "main": [
+        [
+          {
+            "node": "Step 13: Reward‑vs‑risk ranker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 12: Filter by strong rank1": {
+      "main": [
+        [
+          {
+            "node": "Step 13: Reward‑vs‑risk ranker1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 12: Filter by strong rank2": {
+      "main": [
+        [
+          {
+            "node": "Step 13: Reward‑vs‑risk ranker2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 13: Reward‑vs‑risk ranker": {
+      "main": [
+        [
+          {
+            "node": "Step 14: AI‑ready JSON packager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 13: Reward‑vs‑risk ranker1": {
+      "main": [
+        [
+          {
+            "node": "Step 14: AI‑ready JSON packager1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 13: Reward‑vs‑risk ranker2": {
+      "main": [
+        [
+          {
+            "node": "Step 14: AI‑ready JSON packager2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 14: AI‑ready JSON packager": {
+      "main": [
+        [
+          {
+            "node": "LLM analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 14: AI‑ready JSON packager1": {
+      "main": [
+        [
+          {
+            "node": "LLM analysis1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 14: AI‑ready JSON packager2": {
+      "main": [
+        [
+          {
+            "node": "LLM analysis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b67e6bc6-fc6a-43ad-9bbc-9a4043d067d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aae851201cf4c4bbe40d2ef683fbbae0f29563c534ec9cb85128cd25eb160c28"
+  },
+  "id": "jjqK5raaMe0A1duB",
+  "tags": []
+}
