@@ -39,6 +39,8 @@
     <pre id="output"></pre>
 
     <script>
+      const API_BASE = "http://192.168.178.21:7000";
+
       const labels = {
         en: {
           trailingPE: "Trailing P/E",
@@ -102,7 +104,7 @@
         output.textContent = "Loading...";
 
         try {
-          const res = await fetch(`/fundamentals?tickers=${ticker}`);
+          const res = await fetch(`${API_BASE}/fundamentals?tickers=${ticker}`);
           const data = await res.json();
           const d = data.results[0];
 
