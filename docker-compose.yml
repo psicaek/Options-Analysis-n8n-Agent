@@ -27,6 +27,15 @@ services:
     networks:
       - appnet
 
+  frontend:
+    build: ./frontend
+    container_name: fundamentals-frontend
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+    networks:
+      - appnet
+
 networks:
   appnet:
 

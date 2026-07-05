@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ticker Fundamentals</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 500px;
+        margin: 40px auto;
+      }
+      input,
+      select,
+      button {
+        padding: 8px;
+        margin: 5px 0;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 15px;
+        border-radius: 6px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Ticker Fundamentals</h2>
+    <input id="ticker" placeholder="e.g. AAPL" />
+    <select id="lang">
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+      <option value="el">Ελληνικά</option>
+      <option value="fr">Français</option>
+      <option value="es">Español</option>
+    </select>
+    <button onclick="run()">Get Data</button>
+    <pre id="output"></pre>
+
+    <script>
+      const labels = {
+        en: {
+          trailingPE: "Trailing P/E",
+          forwardPE: "Forward P/E",
+          priceToSales: "Price/Sales",
+          priceToBook: "Price/Book",
+          returnOnAssets: "Return on Assets",
+          returnOnEquity: "Return on Equity",
+          debtToEquity: "Debt/Equity",
+          profitMargins: "Profit Margin",
+        },
+        de: {
+          trailingPE: "KGV (Trailing)",
+          forwardPE: "KGV (Forward)",
+          priceToSales: "Kurs/Umsatz",
+          priceToBook: "Kurs/Buchwert",
+          returnOnAssets: "Gesamtkapitalrendite",
+          returnOnEquity: "Eigenkapitalrendite",
+          debtToEquity: "Verschuldungsgrad",
+          profitMargins: "Gewinnmarge",
+        },
+        el: {
+          trailingPE: "Δείκτης Τιμής/Κερδών",
+          forwardPE: "Μελλοντικός Δ.Τ.Κ.",
+          priceToSales: "Τιμή/Πωλήσεις",
+          priceToBook: "Τιμή/Λογιστική Αξία",
+          returnOnAssets: "Απόδοση Ενεργητικού",
+          returnOnEquity: "Απόδοση Ιδίων Κεφαλαίων",
+          debtToEquity: "Χρέος/Ίδια Κεφάλαια",
+          profitMargins: "Περιθώριο Κέρδους",
+        },
+        fr: {
+          trailingPE: "PER",
+          forwardPE: "PER Prévisionnel",
+          priceToSales: "Prix/Ventes",
+          priceToBook: "Prix/Valeur Comptable",
+          returnOnAssets: "Rentabilité des actifs",
+          returnOnEquity: "Rentabilité des capitaux propres",
+          debtToEquity: "Dette/Capitaux propres",
+          profitMargins: "Marge Bénéficiaire",
+        },
+        es: {
+          trailingPE: "PER",
+          forwardPE: "PER Futuro",
+          priceToSales: "Precio/Ventas",
+          priceToBook: "Precio/Valor Contable",
+          returnOnAssets: "Rentabilidad de activos",
+          returnOnEquity: "Rentabilidad sobre recursos propios",
+          debtToEquity: "Deuda/Patrimonio",
+          profitMargins: "Margen de Beneficio",
+        },
+      };
+
+      async function run() {
+        const ticker = document
+          .getElementById("ticker")
+          .value.trim()
+          .toUpperCase();
+        const lang = document.getElementById("lang").value;
+        const output = document.getElementById("output");
+        output.textContent = "Loading...";
+
+        try {
+          const res = await fetch(`/fundamentals?tickers=${ticker}`);
+          const data = await res.json();
+          const d = data.results[0];
+
+          if (d.error) {
+            output.textContent = "Error: " + d.error;
+            return;
+          }
+
+          const L = labels[lang];
+          let html = `Ticker: ${d.ticker}\nPrice: ${d.price}\n\n`;
+          html += `${L.trailingPE}: ${d.trailingPE}\n`;
+          html += `${L.forwardPE}: ${d.forwardPE}\n`;
+          html += `${L.priceToSales}: ${d.priceToSales}\n`;
+          html += `${L.priceToBook}: ${d.priceToBook}\n`;
+          html += `${L.returnOnAssets}: ${d.returnOnAssets}\n`;
+          html += `${L.returnOnEquity}: ${d.returnOnEquity}\n`;
+          html += `${L.debtToEquity}: ${d.debtToEquity}\n`;
+          html += `${L.profitMargins}: ${d.profitMargins}\n`;
+
+          output.textContent = html;
+        } catch (e) {
+          output.textContent = "Request failed: " + e;
+        }
+      }
+    </script>
+  </body>
+</html>

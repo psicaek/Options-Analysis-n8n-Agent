@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import List
 import yfinance as yf
 import numpy as np
@@ -7,6 +9,13 @@ import concurrent.futures
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ─────────────────────────────────────────────
 # UTILS
@@ -272,15 +281,18 @@ def stock_metrics(tickers: List[str] = Query(...)):
     return {"results": results}
 
 
+# ─────────────────────────────────────────────
+# /fundamentals
+# ─────────────────────────────────────────────
+
+
 def compute_fundamentals(ticker: str):
     try:
         t = yf.Ticker(ticker)
         info = t.info or {}
-
         return {
             "ticker": ticker.upper(),
             "price": clean_value(get_spot(t)),
-            # ── Valuation Ratios ──
             "trailingPE": clean_value(info.get("trailingPE")),
             "forwardPE": clean_value(info.get("forwardPE")),
             "priceToSales": clean_value(info.get("priceToSalesTrailing12Months")),
@@ -289,17 +301,14 @@ def compute_fundamentals(ticker: str):
                 info.get("trailingPegRatio") or info.get("pegRatio")
             ),
             "enterpriseToEbitda": clean_value(info.get("enterpriseToEbitda")),
-            # ── Profitability / Efficiency ──
             "returnOnAssets": clean_value(info.get("returnOnAssets")),
             "returnOnEquity": clean_value(info.get("returnOnEquity")),
             "profitMargins": clean_value(info.get("profitMargins")),
             "operatingMargins": clean_value(info.get("operatingMargins")),
             "grossMargins": clean_value(info.get("grossMargins")),
-            # ── Leverage / Liquidity ──
             "debtToEquity": clean_value(info.get("debtToEquity")),
             "currentRatio": clean_value(info.get("currentRatio")),
             "quickRatio": clean_value(info.get("quickRatio")),
-            # ── Growth ──
             "earningsGrowth": clean_value(info.get("earningsGrowth")),
             "revenueGrowth": clean_value(info.get("revenueGrowth")),
         }
@@ -309,6 +318,20 @@ def compute_fundamentals(ticker: str):
 
 @app.get("/fundamentals")
 def fundamentals(tickers: List[str] = Query(...)):
+    results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        results = list(executor.map(compute_fundamentals, tickers))
+        futures = {executor.submit(compute_fundamentals, t): t for t in tickers}
+        for future in concurrent.futures.as_completed(futures, timeout=60):
+            ticker = futures[future]
+            try:
+                results.append(future.result(timeout=15))
+            except Exception as e:
+                results.append({"ticker": ticker, "error": f"timeout_or_error: {e}"})
     return {"results": results}
+
+
+# ─────────────────────────────────────────────
+# STATIC FRONTEND (must be mounted LAST)
+# ─────────────────────────────────────────────
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
