@@ -270,3 +270,45 @@ def stock_metrics(tickers: List[str] = Query(...)):
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         results = list(executor.map(compute_metrics, tickers))
     return {"results": results}
+
+
+def compute_fundamentals(ticker: str):
+    try:
+        t = yf.Ticker(ticker)
+        info = t.info or {}
+
+        return {
+            "ticker": ticker.upper(),
+            "price": clean_value(get_spot(t)),
+            # ── Valuation Ratios ──
+            "trailingPE": clean_value(info.get("trailingPE")),
+            "forwardPE": clean_value(info.get("forwardPE")),
+            "priceToSales": clean_value(info.get("priceToSalesTrailing12Months")),
+            "priceToBook": clean_value(info.get("priceToBook")),
+            "pegRatio": clean_value(
+                info.get("trailingPegRatio") or info.get("pegRatio")
+            ),
+            "enterpriseToEbitda": clean_value(info.get("enterpriseToEbitda")),
+            # ── Profitability / Efficiency ──
+            "returnOnAssets": clean_value(info.get("returnOnAssets")),
+            "returnOnEquity": clean_value(info.get("returnOnEquity")),
+            "profitMargins": clean_value(info.get("profitMargins")),
+            "operatingMargins": clean_value(info.get("operatingMargins")),
+            "grossMargins": clean_value(info.get("grossMargins")),
+            # ── Leverage / Liquidity ──
+            "debtToEquity": clean_value(info.get("debtToEquity")),
+            "currentRatio": clean_value(info.get("currentRatio")),
+            "quickRatio": clean_value(info.get("quickRatio")),
+            # ── Growth ──
+            "earningsGrowth": clean_value(info.get("earningsGrowth")),
+            "revenueGrowth": clean_value(info.get("revenueGrowth")),
+        }
+    except Exception as e:
+        return {"ticker": ticker, "error": str(e)}
+
+
+@app.get("/fundamentals")
+def fundamentals(tickers: List[str] = Query(...)):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(compute_fundamentals, tickers))
+    return {"results": results}
