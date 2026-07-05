@@ -28,7 +28,7 @@ services:
       - appnet
 
   frontend:
-    build: ./frontend
+    build: ./static
     container_name: fundamentals-frontend
     ports:
       - "8081:80"
