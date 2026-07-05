@@ -2,47 +2,243 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ticker Fundamentals</title>
     <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
       body {
-        font-family: Arial, sans-serif;
-        max-width: 500px;
-        margin: 40px auto;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          sans-serif;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+      .container {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 480px;
+        width: 100%;
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        padding: 28px 24px;
+        color: #fff;
+      }
+      .header h1 {
+        font-size: 22px;
+        font-weight: 600;
+      }
+      .header p {
+        font-size: 13px;
+        opacity: 0.85;
+        margin-top: 4px;
+      }
+      .controls {
+        padding: 24px;
+        display: flex;
+        gap: 10px;
       }
       input,
-      select,
-      button {
-        padding: 8px;
-        margin: 5px 0;
-        width: 100%;
-        box-sizing: border-box;
+      select {
+        padding: 12px 14px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
       }
-      pre {
-        background: #f4f4f4;
-        padding: 15px;
-        border-radius: 6px;
-        white-space: pre-wrap;
+      input:focus,
+      select:focus {
+        border-color: #764ba2;
+      }
+      input {
+        flex: 1;
+        text-transform: uppercase;
+      }
+      select {
+        width: 110px;
+      }
+      button {
+        width: calc(100% - 48px);
+        margin: 0 24px 24px;
+        padding: 13px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(118, 75, 162, 0.35);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .result {
+        padding: 0 24px 24px;
+        display: none;
+      }
+      .price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        background: #f8f9fb;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 14px;
+      }
+      .price-row .ticker {
+        font-size: 18px;
+        font-weight: 700;
+        color: #2c3e50;
+      }
+      .price-row .price {
+        font-size: 22px;
+        font-weight: 700;
+        color: #764ba2;
+      }
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .metric-card {
+        background: #f8f9fb;
+        border-radius: 10px;
+        padding: 12px 14px;
+        border-left: 3px solid #ccc;
+        position: relative;
+      }
+      .metric-card .label {
+        font-size: 11px;
+        color: #8a94a6;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+      }
+      .metric-card .value-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .metric-card .value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #2c3e50;
+      }
+      .score-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 10px;
+        color: #fff;
+      }
+      .score-10,
+      .score-9,
+      .score-8 {
+        background: #27ae60;
+      }
+      .score-7,
+      .score-6 {
+        background: #8bc34a;
+      }
+      .score-5,
+      .score-4 {
+        background: #f39c12;
+      }
+      .score-3,
+      .score-2 {
+        background: #e67e22;
+      }
+      .score-1 {
+        background: #c0392b;
+      }
+      .score-na {
+        background: #95a5a6;
+      }
+      .error-box {
+        padding: 24px;
+        color: #c0392b;
+        background: #fdf1f0;
+        border-radius: 10px;
+        margin: 0 24px 24px;
+        font-size: 14px;
+        display: none;
+      }
+      .spinner {
+        display: none;
+        justify-content: center;
+        padding: 30px;
+      }
+      .spinner div {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #eee;
+        border-top-color: #764ba2;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
     </style>
   </head>
   <body>
-    <h2>Ticker Fundamentals</h2>
-    <input id="ticker" placeholder="e.g. AAPL" />
-    <select id="lang">
-      <option value="en">English</option>
-      <option value="de">Deutsch</option>
-      <option value="el">Ελληνικά</option>
-      <option value="fr">Français</option>
-      <option value="es">Español</option>
-    </select>
-    <button onclick="run()">Get Data</button>
-    <pre id="output"></pre>
+    <div class="container">
+      <div class="header">
+        <h1 id="titleText">📊 Ticker Fundamentals</h1>
+        <p id="subtitleText">
+          Live valuation & profitability metrics via Yahoo Finance
+        </p>
+      </div>
+
+      <div class="controls">
+        <input id="ticker" placeholder="AAPL" maxlength="10" />
+        <select id="lang">
+          <option value="en">English</option>
+          <option value="el">Ελληνικά</option>
+        </select>
+      </div>
+      <button id="btn" onclick="run()">Get Data</button>
+
+      <div class="spinner" id="spinner"><div></div></div>
+      <div class="error-box" id="errorBox"></div>
+
+      <div class="result" id="result">
+        <div class="price-row">
+          <div class="ticker" id="outTicker">—</div>
+          <div class="price" id="outPrice">—</div>
+        </div>
+        <div class="metrics-grid" id="metricsGrid"></div>
+      </div>
+    </div>
 
     <script>
-      const API_BASE = "http://192.168.178.21:7000";
+      const API_BASE = `${window.location.protocol}//${window.location.hostname}:7000`;
 
       const labels = {
         en: {
+          title: "📊 Ticker Fundamentals",
+          subtitle: "Live valuation & profitability metrics via Yahoo Finance",
           trailingPE: "Trailing P/E",
           forwardPE: "Forward P/E",
           priceToSales: "Price/Sales",
@@ -51,18 +247,11 @@
           returnOnEquity: "Return on Equity",
           debtToEquity: "Debt/Equity",
           profitMargins: "Profit Margin",
-        },
-        de: {
-          trailingPE: "KGV (Trailing)",
-          forwardPE: "KGV (Forward)",
-          priceToSales: "Kurs/Umsatz",
-          priceToBook: "Kurs/Buchwert",
-          returnOnAssets: "Gesamtkapitalrendite",
-          returnOnEquity: "Eigenkapitalrendite",
-          debtToEquity: "Verschuldungsgrad",
-          profitMargins: "Gewinnmarge",
+          getData: "Get Data",
         },
         el: {
+          title: "📊 Θεμελιώδη Μετοχής",
+          subtitle: "Δείκτες αποτίμησης & κερδοφορίας μέσω Yahoo Finance",
           trailingPE: "Δείκτης Τιμής/Κερδών",
           forwardPE: "Μελλοντικός Δ.Τ.Κ.",
           priceToSales: "Τιμή/Πωλήσεις",
@@ -71,28 +260,83 @@
           returnOnEquity: "Απόδοση Ιδίων Κεφαλαίων",
           debtToEquity: "Χρέος/Ίδια Κεφάλαια",
           profitMargins: "Περιθώριο Κέρδους",
-        },
-        fr: {
-          trailingPE: "PER",
-          forwardPE: "PER Prévisionnel",
-          priceToSales: "Prix/Ventes",
-          priceToBook: "Prix/Valeur Comptable",
-          returnOnAssets: "Rentabilité des actifs",
-          returnOnEquity: "Rentabilité des capitaux propres",
-          debtToEquity: "Dette/Capitaux propres",
-          profitMargins: "Marge Bénéficiaire",
-        },
-        es: {
-          trailingPE: "PER",
-          forwardPE: "PER Futuro",
-          priceToSales: "Precio/Ventas",
-          priceToBook: "Precio/Valor Contable",
-          returnOnAssets: "Rentabilidad de activos",
-          returnOnEquity: "Rentabilidad sobre recursos propios",
-          debtToEquity: "Deuda/Patrimonio",
-          profitMargins: "Margen de Beneficio",
+          getData: "Λήψη Δεδομένων",
         },
       };
+
+      function fmt(v) {
+        if (v === null || v === undefined) return "—";
+        if (typeof v === "number") return v.toFixed(2);
+        return v;
+      }
+
+      // Scoring: higher = better. Returns 1-10 or null if no data.
+      function scorePE(v) {
+        if (v === null || v === undefined || v <= 0) return null;
+        if (v <= 12) return 10;
+        if (v <= 18) return 8;
+        if (v <= 25) return 6;
+        if (v <= 35) return 4;
+        if (v <= 50) return 2;
+        return 1;
+      }
+      function scorePS(v) {
+        if (v === null || v === undefined || v < 0) return null;
+        if (v <= 1) return 10;
+        if (v <= 2) return 8;
+        if (v <= 4) return 6;
+        if (v <= 7) return 4;
+        if (v <= 10) return 2;
+        return 1;
+      }
+      function scorePB(v) {
+        if (v === null || v === undefined || v < 0) return null;
+        if (v <= 1) return 10;
+        if (v <= 3) return 8;
+        if (v <= 5) return 6;
+        if (v <= 8) return 4;
+        if (v <= 12) return 2;
+        return 1;
+      }
+      function scoreROA(v) {
+        if (v === null || v === undefined) return null;
+        const pct = v * 100;
+        if (pct >= 15) return 10;
+        if (pct >= 10) return 8;
+        if (pct >= 5) return 6;
+        if (pct >= 2) return 4;
+        if (pct >= 0) return 2;
+        return 1;
+      }
+      function scoreROE(v) {
+        if (v === null || v === undefined) return null;
+        const pct = v * 100;
+        if (pct >= 25) return 10;
+        if (pct >= 18) return 8;
+        if (pct >= 12) return 6;
+        if (pct >= 5) return 4;
+        if (pct >= 0) return 2;
+        return 1;
+      }
+      function scoreDE(v) {
+        if (v === null || v === undefined || v < 0) return null;
+        if (v <= 30) return 10;
+        if (v <= 60) return 8;
+        if (v <= 100) return 6;
+        if (v <= 150) return 4;
+        if (v <= 200) return 2;
+        return 1;
+      }
+      function scoreMargin(v) {
+        if (v === null || v === undefined) return null;
+        const pct = v * 100;
+        if (pct >= 20) return 10;
+        if (pct >= 12) return 8;
+        if (pct >= 6) return 6;
+        if (pct >= 2) return 4;
+        if (pct >= 0) return 2;
+        return 1;
+      }
 
       async function run() {
         const ticker = document
@@ -100,35 +344,77 @@
           .value.trim()
           .toUpperCase();
         const lang = document.getElementById("lang").value;
-        const output = document.getElementById("output");
-        output.textContent = "Loading...";
+        const btn = document.getElementById("btn");
+        const spinner = document.getElementById("spinner");
+        const errorBox = document.getElementById("errorBox");
+        const result = document.getElementById("result");
+
+        if (!ticker) return;
+
+        btn.disabled = true;
+        spinner.style.display = "flex";
+        errorBox.style.display = "none";
+        result.style.display = "none";
 
         try {
           const res = await fetch(`${API_BASE}/fundamentals?tickers=${ticker}`);
           const data = await res.json();
           const d = data.results[0];
 
-          if (d.error) {
-            output.textContent = "Error: " + d.error;
-            return;
-          }
+          if (!d || d.error) throw new Error(d?.error || "Unknown error");
 
           const L = labels[lang];
-          let html = `Ticker: ${d.ticker}\nPrice: ${d.price}\n\n`;
-          html += `${L.trailingPE}: ${d.trailingPE}\n`;
-          html += `${L.forwardPE}: ${d.forwardPE}\n`;
-          html += `${L.priceToSales}: ${d.priceToSales}\n`;
-          html += `${L.priceToBook}: ${d.priceToBook}\n`;
-          html += `${L.returnOnAssets}: ${d.returnOnAssets}\n`;
-          html += `${L.returnOnEquity}: ${d.returnOnEquity}\n`;
-          html += `${L.debtToEquity}: ${d.debtToEquity}\n`;
-          html += `${L.profitMargins}: ${d.profitMargins}\n`;
+          document.getElementById("outTicker").textContent = d.ticker;
+          document.getElementById("outPrice").textContent = d.price
+            ? `$${fmt(d.price)}`
+            : "—";
 
-          output.textContent = html;
+          const grid = document.getElementById("metricsGrid");
+          grid.innerHTML = "";
+          const items = [
+            [L.trailingPE, d.trailingPE, scorePE(d.trailingPE)],
+            [L.forwardPE, d.forwardPE, scorePE(d.forwardPE)],
+            [L.priceToSales, d.priceToSales, scorePS(d.priceToSales)],
+            [L.priceToBook, d.priceToBook, scorePB(d.priceToBook)],
+            [L.returnOnAssets, d.returnOnAssets, scoreROA(d.returnOnAssets)],
+            [L.returnOnEquity, d.returnOnEquity, scoreROE(d.returnOnEquity)],
+            [L.debtToEquity, d.debtToEquity, scoreDE(d.debtToEquity)],
+            [L.profitMargins, d.profitMargins, scoreMargin(d.profitMargins)],
+          ];
+          items.forEach(([label, val, score]) => {
+            const card = document.createElement("div");
+            card.className = "metric-card";
+            const scoreClass = score === null ? "score-na" : `score-${score}`;
+            const scoreText = score === null ? "N/A" : `${score}/10`;
+            card.innerHTML = `
+        <div class="label">${label}</div>
+        <div class="value-row">
+          <div class="value">${fmt(val)}</div>
+          <div class="score-badge ${scoreClass}">${scoreText}</div>
+        </div>`;
+            grid.appendChild(card);
+          });
+
+          result.style.display = "block";
         } catch (e) {
-          output.textContent = "Request failed: " + e;
+          errorBox.textContent = "⚠ " + e.message;
+          errorBox.style.display = "block";
+        } finally {
+          btn.disabled = false;
+          spinner.style.display = "none";
         }
       }
+
+      document.getElementById("lang").addEventListener("change", (e) => {
+        const L = labels[e.target.value];
+        document.getElementById("titleText").textContent = L.title;
+        document.getElementById("subtitleText").textContent = L.subtitle;
+        document.getElementById("btn").textContent = L.getData;
+      });
+
+      document.getElementById("ticker").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") run();
+      });
     </script>
   </body>
 </html>
